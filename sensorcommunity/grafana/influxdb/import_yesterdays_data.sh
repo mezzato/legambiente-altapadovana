@@ -3,6 +3,8 @@
 export DATE=$(/bin/date -d yesterday +%F)
 export WORKPATH=$(readlink -f ./mirror)
 
+export SENSORS_BY_CITY=$(readlink -f ./sensors_by_city.csv)
+
 echo Datum: $DATE
 
 mkdir -p $WORKPATH
@@ -11,8 +13,6 @@ host archive.sensor.community
 sleep 10
 
 pushd $WORKPATH
-
-SENSORS_BY_CITY=sensors_by_city.csv
 
 if [ -f "$SENSORS_BY_CITY" ]; then
     echo "$SENSORS_BY_CITY found."
