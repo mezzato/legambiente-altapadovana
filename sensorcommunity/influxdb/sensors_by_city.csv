@@ -1,4 +1,4 @@
-sensor_id,sensor_type,node,city
+sensor_id,sensor_type,chip_id,city
 62574,SDS011,esp8266-15303512,Carmignano di Brenta
 62575,DHT22,esp8266-15303512,Carmignano di Brenta
 62177,SDS011,nil,Carmignano di Brenta

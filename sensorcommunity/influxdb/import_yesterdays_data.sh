@@ -52,9 +52,8 @@ for line in $(sed 1,1d $SENSORS_BY_CITY); do
     influx write -b sensorcommunity \
         -f $file \
         --header "#constant measurement,particulate" \        
-        --header "#constant tag,chip_id,$chip_id" \
-        --header "#constant tag,city,$city" \
-        --header "#constant measurement,particulate" \
+        --header "#constant tag,chip_id,${chip_id}" \
+        --header "#constant tag,city,${city}" \
         --header "#datatype tag,tag,tag,double,double,dateTime:2006-01-02T15:04:05,double,double,double,double,double,double" \
         --skip-verify
 
