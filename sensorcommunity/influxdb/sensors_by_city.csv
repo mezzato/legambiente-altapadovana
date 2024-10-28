@@ -1,12 +1,12 @@
 sensor_id,sensor_type,chip_id,city
 62574,SDS011,esp8266-15303512,Carmignano di Brenta
 62575,DHT22,esp8266-15303512,Carmignano di Brenta
-62177,SDS011,nil,Carmignano di Brenta
-87891,SDS011,nil,Carmignano di Brenta
-88091,SDS011,nil,Carmignano di Brenta
-88093,SDS011,nil,Carmignano di Brenta
-86296,SDS011,nil,Carmignano di Brenta
-66927,SDS011,nil,Carmignano di Brenta
-63012,SDS011,nil,Carmignano di Brenta
-59571,SDS011,nil,Camporovere
-78027,SDS011,nil,Canove
+62177,SDS011,,Carmignano di Brenta
+87891,SDS011,,Carmignano di Brenta
+88091,SDS011,,Carmignano di Brenta
+88093,SDS011,,Carmignano di Brenta
+86296,SDS011,,Carmignano di Brenta
+66927,SDS011,,Carmignano di Brenta
+63012,SDS011,,Carmignano di Brenta
+59571,SDS011,,Camporovere
+78027,SDS011,,Canove
