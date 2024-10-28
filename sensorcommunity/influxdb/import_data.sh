@@ -1,7 +1,9 @@
 #! /bin/bash
 
-read -p 'start date (format 2024-10-27): ' $START
-read -p 'end date (format 2024-10-27): ' $END
+echo -n "start date (for example 2024-10-27): "
+read START
+echo -n "end date (for example 2024-10-27): "
+read END
 
 export WORKPATH=$(readlink -f ./mirror)
 export SENSORS_BY_CITY=$(readlink -f ./sensors_by_city.csv)
@@ -20,7 +22,9 @@ fi
 host archive.sensor.community
 sleep 1
 
-IFS=$'\n' # set the Internal Field Separator to newline
+echo start date: $START
+echo end date: $END
+
 
 # After this, startdate and enddate will be valid ISO 8601 dates,
 # or the script will have aborted when it encountered unparseable data
@@ -28,14 +32,11 @@ IFS=$'\n' # set the Internal Field Separator to newline
 startdate=$(date -I -d "$START") || exit -1
 enddate=$(date -I -d "$END") || exit -1
 
-echo start date: $startdate
-echo end date: $enddate
-
 DATE="$startdate"
-while [[ "$DATE" le "$enddate" ]]; do
+while [[ "$(date -d "$DATE" +%Y%m%d)" -le "$(date -d "$enddate" +%Y%m%d)" ]]; do
     echo "importing date: $DATE"
-    DATE=$(date -I -d "$DATE + 1 day")
 
+    IFS=$'\n' # set the Internal Field Separator to newline
     for line in $(sed 1,1d $SENSORS_BY_CITY); do
         IFS=$','
         split=($line)
@@ -64,7 +65,7 @@ while [[ "$DATE" le "$enddate" ]]; do
         echo "Uploading $file to influxdb"
         influx write -b sensorcommunity \
             -f $file \
-            --header "#constant measurement,particulate" \
+            --header "#constant measurement,particulate_test" \
             --header "#constant tag,chip_id,${chip_id}" \
             --header "#constant tag,city,${city}" \
             --header "#datatype tag,tag,tag,double,double,dateTime:2006-01-02T15:04:05,double,double,double,double,double,double" \
@@ -73,6 +74,8 @@ while [[ "$DATE" le "$enddate" ]]; do
         rm $file
 
     done
+
+    DATE=$(date -I -d "$DATE + 1 day")
 done
 
 popd
