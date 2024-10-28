@@ -65,7 +65,7 @@ while [[ "$(date -d "$DATE" +%Y%m%d)" -le "$(date -d "$enddate" +%Y%m%d)" ]]; do
         echo "Uploading $file to influxdb"
         influx write -b sensorcommunity \
             -f $file \
-            --header "#constant measurement,particulate_test" \
+            --header "#constant measurement,particulate" \
             --header "#constant tag,chip_id,${chip_id}" \
             --header "#constant tag,city,${city}" \
             --header "#datatype tag,tag,tag,double,double,dateTime:2006-01-02T15:04:05,double,double,double,double,double,double" \
