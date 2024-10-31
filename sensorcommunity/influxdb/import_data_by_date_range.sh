@@ -62,6 +62,8 @@ while [[ "$(date -d "$DATE" +%Y%m%d)" -le "$(date -d "$enddate" +%Y%m%d)" ]]; do
 
         sed -i 's/;/,/g' $file
 
+        # sensor_id;sensor_type;location;lat;lon;timestamp;P1;durP1;ratioP1;P2;durP2;ratioP2
+        # 62574;SDS011;77629;45.630;11.704;2024-10-30T00:01:08;15.30;;;8.98;;
         echo "Uploading $file to influxdb"
         influx write -b sensorcommunity \
             -f $file \
