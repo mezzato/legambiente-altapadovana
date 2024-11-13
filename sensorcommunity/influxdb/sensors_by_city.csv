@@ -6,6 +6,7 @@ sensor_id,sensor_type,chip_id,city
 88091,SDS011,,Carmignano di Brenta
 88093,SDS011,,Carmignano di Brenta
 86296,SDS011,,Carmignano di Brenta
+86297,BME280,,Carmignano di Brenta
 66927,SDS011,,Carmignano di Brenta
 63012,SDS011,,Carmignano di Brenta
 59571,SDS011,,Camporovere
