@@ -4,9 +4,17 @@ echo -n "start date (for example 2024-10-27): "
 read START
 echo -n "end date (for example 2024-10-27): "
 read END
+echo -n "csv file with sensors_by_city (default ./sensors_by_city.csv): "
+read CSV_FILE
+
+if [ -z "$CSV_FILE" ]
+then
+  CSV_FILE="./sensors_by_city.csv"
+  echo "using default: $CSV_FILE"
+fi
 
 export WORKPATH=$(readlink -f ./mirror)
-export SENSORS_BY_CITY=$(readlink -f ./sensors_by_city.csv)
+export SENSORS_BY_CITY=$(readlink -f $CSV_FILE)
 
 mkdir -p $WORKPATH
 
