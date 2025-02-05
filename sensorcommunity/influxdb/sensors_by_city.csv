@@ -17,6 +17,7 @@ sensor_id,sensor_type,chip_id,city
 73136,SDS011,,Fontaniva
 63016,SDS011,,Fontaniva
 64816,SDS011,,Fontaniva
+78053,SDS011,,Fontaniva
 18076,SDS011,,Schio
 83910,BME280,,Schio
 83890,BME280,,Thiene
