@@ -109,3 +109,13 @@ Questo time range puo' essere:
 1. ogni 2 secondi -> time series (diagramma temporale)
 1. media in fasce orarie (7-17) per giorno -> bar chart
 1. media degli ultimi 10 minuti -> gauge
+
+
+## Come aggiungere / togliere una centralina
+
+Con gli opportuni diritti di accesso editare il file <https://github.com/mezzato/legambiente-altapadovana/blob/main/sensorcommunity/influxdb/sensors_by_city.csv> e salvare.
+
+
+## Per curiosita' si possono vedere gli alert
+
+<https://aernostrum.it:3000/alerting/list>
