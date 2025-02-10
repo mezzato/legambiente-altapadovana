@@ -59,7 +59,7 @@ else:
             
             # Download the file from `url` and save it locally under `file_name`
 
-            print(f"importing sensor id {}".format(sensor_id))
+            print("importing sensor id {sensor_id}")
             url = f'https://data.sensor.community/airrohr/v1/sensor/{sensor_id}/'
             # print(f"Downloading {url}\n")
             try:
@@ -67,12 +67,12 @@ else:
             except urllib.error.HTTPError as e:
                 # Return code error (e.g. 404, 501, ...)
                 # ...
-                print('HTTPError: {}, URL: {url}'.format(e.code))
+                print('HTTPError: {}, URL: {}'.format(e.code, url))
                 continue
             except urllib.error.URLError as e:
                 # Not an HTTP-specific error (e.g. connection refused)
                 # ...
-                print('URLError: {}, URL: {url}'.format(e.reason))
+                print('URLError: {}, URL: {}'.format(e.reason, url))
                 continue
             else:
                 # 200
