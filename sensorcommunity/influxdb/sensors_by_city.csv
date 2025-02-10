@@ -1,0 +1,27 @@
+sensor_id,sensor_type,chip_id,city
+59571,SDS011,,Camporovere
+78027,SDS011,,Canove
+62574,SDS011,esp8266-15303512,Carmignano di Brenta
+62575,DHT22,esp8266-15303512,Carmignano di Brenta
+62177,SDS011,,Carmignano di Brenta
+87891,SDS011,,Carmignano di Brenta
+88091,SDS011,,Carmignano di Brenta
+88093,SDS011,,Carmignano di Brenta
+86296,SDS011,,Carmignano di Brenta
+86297,BME280,,Carmignano di Brenta
+66927,SDS011,,Carmignano di Brenta
+63012,SDS011,,Carmignano di Brenta
+87372,SDS011,,Cittadella
+55312,SDS011,,Cittadella
+71648,SDS011,,Fontaniva
+73136,SDS011,,Fontaniva
+63016,SDS011,,Fontaniva
+64816,SDS011,,Fontaniva
+78053,SDS011,,Fontaniva
+18076,SDS011,,Schio
+83910,BME280,,Schio
+83890,BME280,,Thiene
+83889,SDS011,,Thiene
+34681,SDS011,,Thiene
+33160,SDS011,,Valdagno
+33161,BME280,,Valdagno

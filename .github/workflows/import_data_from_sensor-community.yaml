@@ -1,0 +1,41 @@
+name: "Import data from Sensor Community"
+run-name: "qr: Import sensor IDs: ${{ inputs.sensors }}, from ${{ inputs.start }} to  ${{ inputs.end }}"
+on:
+  workflow_dispatch:
+    inputs:
+      sensors:
+        type: string
+        description: "comma-separated list of sensor IDs, example: 62555,64255, if missing all"
+        required: false
+        default: ""
+      start:
+        type: date
+        description: "start date (format 2024-12-27), if missing yesterday"
+        required: false
+        default: ""
+      end:
+        type: date
+        description: "end date (format 2024-12-27), if missing yesterday"
+        required: false
+        default: ""
+
+
+jobs:
+  import-sensor-community-daily-data:
+    name: Import daily data from Sensor Community
+    environment: legambiente-prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import daily data from Sensor Community for specific sensors
+        working-directory: ./sensorcommunity/influxdb
+        run: |
+          ./generate_influxdb_config.sh
+          ./import_data_by_date_range.sh
+        env:
+          INFLUXDB_ORG: ${{ secrets.INFLUXDB_ORG }}
+          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
+          INFLUXDB_URL: ${{ secrets.INFLUXDB_URL }}
+          START: ${{ inputs.start }}
+          END: ${{ inputs.end }}
+          SENSORS: ${{ inputs.sensors }}
