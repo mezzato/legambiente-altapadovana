@@ -62,7 +62,7 @@ else:
             url = f'https://data.sensor.community/airrohr/v1/sensor/{sensor_id}/'
             # print(f"Downloading {url}\n")
             try:
-                response = urllib.request.urlopen(url)
+                response = urllib.request.urlopen(url, timeout=10)
             except urllib.error.HTTPError as e:
                 # Return code error (e.g. 404, 501, ...)
                 # ...
