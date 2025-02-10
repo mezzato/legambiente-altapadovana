@@ -55,11 +55,10 @@ else:
             city=row[3]
 
             filename= mpath.joinpath(sensor_id + ".json")
-
             
             # Download the file from `url` and save it locally under `file_name`
 
-            print("importing sensor id {sensor_id}")
+            print(f"importing sensor id {sensor_id}")
             url = f'https://data.sensor.community/airrohr/v1/sensor/{sensor_id}/'
             # print(f"Downloading {url}\n")
             try:
