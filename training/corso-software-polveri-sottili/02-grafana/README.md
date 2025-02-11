@@ -20,6 +20,17 @@ Il file da editare e' [sensorcommunity/influxdb/sensors_by_city.csv](https://git
 - salvare i cambiamenti
   ![commit changes](./media/commit-changes.png)
 
+## Come importare dati storici dei sensori
+
+1. Aprire questa [pagina](https://github.com/mezzato/legambiente-altapadovana/actions/workflows/import_data_from_sensor-community.yaml), che si trova su "actions" ->  "Import data from sensor community".
+
+2. Scegliere "Run workflow" e riempiri le caselle: 
+   - lista degli ID dei sensori separata da ","
+   - data d'inizio (start date), nel formato 2025-01-30
+   - data di fine (end date), nel formato 2025-01-30
+
+3. Controllare il risultato dell'esecuzione
+
 ## Dashboard di Grafana
 
 link utili: [documentazione di Grafana su dashboard(inglese)](https://grafana.com/docs/grafana/latest/dashboards/)
