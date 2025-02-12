@@ -22,6 +22,8 @@ Il file da editare e' [sensorcommunity/influxdb/sensors_by_city.csv](https://git
 
 ## Come importare dati storici dei sensori
 
+**Nota: ** Il sito di Sensor Community a volte e' inaccessibile, si puo' controllare lo stato qui: <https://status.sensor.community/>
+
 1. Aprire questa [pagina](https://github.com/mezzato/legambiente-altapadovana/actions/workflows/import_data_from_sensor-community.yaml), che si trova su "actions" ->  "Import data from sensor community".
 
 2. Scegliere "Run workflow" e riempiri le caselle: 
