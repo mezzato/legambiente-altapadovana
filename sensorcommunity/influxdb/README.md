@@ -18,6 +18,7 @@ influx delete --bucket sensorcommunity --predicate '_measurement="particulate"' 
   python3 -m venv .venv
   .venv/bin/pip install influxdb-client
   .venv/bin/pip install python-dateutil
+  .venv/bin/pip install requests
   ```
 
 - Generate the config.json file. 

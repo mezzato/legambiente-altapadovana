@@ -8,7 +8,9 @@ from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.client.exceptions import InfluxDBError
 
-import urllib.request, csv, shutil
+import requests
+import urllib3
+import csv, shutil
 
 from pathlib import Path
 import errno
@@ -45,6 +47,8 @@ else:
         line_count = -1
         points = []
 
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         for row in csv_reader:
             line_count += 1
             if line_count == 0:
@@ -62,13 +66,14 @@ else:
             url = f'https://data.sensor.community/airrohr/v1/sensor/{sensor_id}/'
             # print(f"Downloading {url}\n")
             try:
-                response = urllib.request.urlopen(url, timeout=10)
-            except urllib.error.HTTPError as e:
+                # response = urllib.request.urlopen(url, timeout=10)
+                response = requests.get(url, verify=False, timeout=10)
+            except urllib3.error.HTTPError as e:
                 # Return code error (e.g. 404, 501, ...)
                 # ...
                 print('HTTPError: {}, URL: {}'.format(e.code, url))
                 continue
-            except urllib.error.URLError as e:
+            except urllib3.error.URLError as e:
                 # Not an HTTP-specific error (e.g. connection refused)
                 # ...
                 print('URLError: {}, URL: {}'.format(e.reason, url))
@@ -76,8 +81,12 @@ else:
             else:
                 # 200
                 # ...
-                with open(filename, 'wb') as out_file:
-                    shutil.copyfileobj(response, out_file)
+                # with open(filename, 'wb') as out_file:
+                #    shutil.copyfileobj(response.text, out_file)
+
+                print('downloaded: {} bytes, from: {}'.format(len(response.content), url))
+                with open(filename, 'w') as f:
+                    f.write(response.text)
                 
             
             with open(filename, "r") as json_file:
