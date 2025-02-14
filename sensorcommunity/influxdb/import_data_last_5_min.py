@@ -68,17 +68,18 @@ else:
             try:
                 # response = urllib.request.urlopen(url, timeout=10)
                 response = requests.get(url, verify=False, timeout=10)
+                response.raise_for_status()
             except requests.exceptions.HTTPError as e:
                 # Return code error (e.g. 404, 501, ...)
                 # ...
                 print('HTTPError: {}, URL: {}, status code: {}'.format(e.args[0], url, response.status_code))
                 continue
-            except requests.exceptions.InvalidURL as e:
+            except requests.exceptions.ConnectionError as e:
                 # Not an HTTP-specific error (e.g. connection refused)
                 # ...
-                print('InvalidURL: {}, URL: {}'.format(e, url))
+                print('ConnectionError: {}, URL: {}'.format(e, url))
                 continue
-            except requests.exceptions.ReadTimeout as e:
+            except requests.exceptions.Timeout as e:
                 print('Timeout error: {}, URL: {}'.format(e, url))
                 continue
             except requests.exceptions.RequestException as e:
