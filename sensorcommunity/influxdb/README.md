@@ -15,6 +15,11 @@ influx delete --bucket sensorcommunity --predicate '_measurement="particulate"' 
 - Install the python 3 virtual environment:
 
   ```
+  sudo apt install python3-pip
+
+  # use python3 --version to determine the specific version
+  sudo apt install python3.12-venv
+  
   python3 -m venv .venv
   .venv/bin/pip install influxdb-client
   .venv/bin/pip install python-dateutil
