@@ -90,7 +90,7 @@ else:
                 # with open(filename, 'wb') as out_file:
                 #    shutil.copyfileobj(response.text, out_file)
 
-                print('downloaded: {} bytes, from: {}'.format(len(response.content), url))
+                print('response OK: {}, status code: {}, downloaded: {} bytes, from: {}'.format(response.ok, response.status_code, len(response.content), url))
                 with open(filename, 'w') as f:
                     f.write(response.text)
                 
