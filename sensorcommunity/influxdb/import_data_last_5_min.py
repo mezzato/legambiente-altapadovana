@@ -10,7 +10,8 @@ from influxdb_client.client.exceptions import InfluxDBError
 
 import requests
 import urllib3
-import csv, shutil
+import csv
+import random
 
 from pathlib import Path
 import errno
@@ -32,6 +33,16 @@ except OSError as exc:
     if exc.errno != errno.EEXIST:
         raise
     pass
+
+user_agents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15'
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15'
+]
 
 print(f"importing data")
 csv_file_name = basepath.joinpath('./sensors_by_city.csv')                 
@@ -66,8 +77,8 @@ else:
             url = f'https://data.sensor.community/airrohr/v1/sensor/{sensor_id}/'
             # print(f"Downloading {url}\n")
             try:
-                # response = urllib.request.urlopen(url, timeout=10)
-                response = requests.get(url, verify=False, timeout=10)
+                headers = {'User-Agent': random.choice(user_agents)}
+                response = requests.get(url, headers=headers, verify=False, timeout=10)
                 response.raise_for_status()
             except requests.exceptions.HTTPError as e:
                 # Return code error (e.g. 404, 501, ...)
