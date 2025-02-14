@@ -77,7 +77,11 @@ else:
             url = f'https://data.sensor.community/airrohr/v1/sensor/{sensor_id}/'
             # print(f"Downloading {url}\n")
             try:
-                headers = {'User-Agent': random.choice(user_agents)}
+                headers = {
+                    'User-Agent': random.choice(user_agents),
+                    'Origin': 'http://example.com',
+                    'Referer': 'http://example.com/some_page', 
+                }
                 response = requests.get(url, headers=headers, verify=False, timeout=10)
                 response.raise_for_status()
             except requests.exceptions.HTTPError as e:
