@@ -31,7 +31,7 @@ jobs:
         working-directory: ./sensorcommunity/influxdb
         run: |
           ./install_influxdb_cli.sh
-          echo "./bin" >> $GITHUB_PATH
+          echo "`pwd`/bin" >> $GITHUB_PATH
           ./import_data_by_date_range.sh
         env:
           INFLUXDB_ORG: ${{ secrets.INFLUXDB_ORG }}
