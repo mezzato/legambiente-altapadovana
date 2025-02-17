@@ -1,5 +1,11 @@
 #! /bin/bash
 
+# if local program 'foo' returns 1 (doesn't exist) then...                                                                               
+if ! type -P influx; then                                                             
+    echo 'influx client not installed'                                                            
+    exit 1
+fi  
+
 # variable is not set at all
 if [[ ! ${START+x} ]]; then
   echo -n "start date (for example 2024-10-27), default is yesterday: "
