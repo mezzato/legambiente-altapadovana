@@ -73,8 +73,8 @@ echo csv file: $CSV_FILE
 # After this, startdate and enddate will be valid ISO 8601 dates,
 # or the script will have aborted when it encountered unparseable data
 # such as input_end=abcd
-startdate=$(date -I -d "$START") || exit -1
-enddate=$(date -I -d "$END") || exit -1
+startdate=$(date -d "$START" +%Y%m%d) || exit -1
+enddate=$(date -d "$END" +%Y%m%d) || exit -1
 
 DATE="$startdate"
 while [[ "$(date -d "$DATE" +%Y%m%d)" -le "$(date -d "$enddate" +%Y%m%d)" ]]; do
