@@ -458,6 +458,7 @@ dependencies = [
  "clap",
  "digest",
  "flate2",
+ "http-body-util",
  "quickcheck",
  "quickcheck_macros",
  "rustix",

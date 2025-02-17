@@ -1,19 +1,22 @@
 mod config;
 mod logging;
 
+use crate::config::{crate_version, init_cli, Arg, Command};
 use axum::{
+    body::{Body, Bytes},
+    extract::{FromRequest, Request},
     handler::HandlerWithoutStateExt,
-    http::{uri::Authority, StatusCode, Uri},
-    response::Redirect,
+    http::{request::Parts, uri::Authority, StatusCode, Uri},
+    middleware::{self, Next},
+    response::{IntoResponse, Redirect, Response},
     routing::post,
     BoxError, Router,
 };
 use axum_extra::extract::Host;
 use axum_server::tls_rustls::RustlsConfig;
+use http_body_util::BodyExt;
 use std::{future::Future, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::signal;
-
-use crate::config::{crate_version, init_cli, Arg, Command};
 
 pub const MANIFEST_NAME: &str = "dataingester.toml";
 
@@ -79,29 +82,34 @@ async fn main() {
     // optional: spawn a second server to redirect http requests to this server
     tokio::spawn(redirect_http_to_https(addresses, shutdown_future));
 
+    let tls_dir = PathBuf::from(
+        shellexpand::env(&config.tls_dir.as_os_str().to_string_lossy())
+            .unwrap()
+            .as_ref(),
+    );
+
+    const CERT_FILE: &str = "cert.pem";
+    const KEY_FILE: &str = "key.pem";
+
     // configure certificate and private key used by https
-    let config = RustlsConfig::from_pem_file(
-        PathBuf::from(&config.tls_dir)
-            .join("self_signed_certs")
-            .join("cert.pem"),
-        PathBuf::from(&config.tls_dir)
-            .join("self_signed_certs")
-            .join("key.pem"),
-    )
-    .await
-    .map_err(|e| {
-        format!(
-            "error loading TLS config files from folder: {}, error: {}",
-            &config.tls_dir.display(),
+    let config = RustlsConfig::from_pem_file(tls_dir.join(CERT_FILE), tls_dir.join(KEY_FILE))
+        .await
+        .map_err(|e| {
+            format!(
+            "error loading TLS config files from folder: {}, certificate: {}, private key: {}, error: {}",
+            &tls_dir.display(),
+            CERT_FILE, KEY_FILE,
             e
         )
-    })
-    .unwrap();
+        })
+        .unwrap();
 
-    let app = Router::new().route("/", post(handler));
+    let app = Router::new()
+        .route("/digest", post(handler))
+        .layer(middleware::from_fn(print_request_body));
 
     // run https server
-    tracing::debug!("listening on {}", addresses.https_addr);
+    tracing::debug!("listening on TLS address: {}", addresses.https_addr);
     axum_server::bind_rustls(addresses.https_addr, config)
         .handle(handle)
         .serve(app.into_make_service())
@@ -137,8 +145,58 @@ async fn shutdown_signal(handle: axum_server::Handle) {
                                                              // to force shutdown
 }
 
-async fn handler() -> &'static str {
-    "Hello, World!"
+// middleware that shows how to consume the request body upfront
+async fn print_request_body(request: Request, next: Next) -> Result<impl IntoResponse, Response> {
+    let request = buffer_request_body(request).await?;
+
+    Ok(next.run(request).await)
+}
+
+// the trick is to take the request apart, buffer the body, do what you need to do, then put
+// the request back together
+async fn buffer_request_body(request: Request) -> Result<Request, Response> {
+    let (parts, body) = request.into_parts();
+
+    // this won't work if the body is an long running stream
+    let bytes = body
+        .collect()
+        .await
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
+        .to_bytes();
+
+    do_thing_with_request_body(bytes.clone(), parts.clone());
+
+    Ok(Request::from_parts(parts, Body::from(bytes)))
+}
+
+fn do_thing_with_request_body(bytes: Bytes, parts: Parts) {
+    tracing::debug!(body = ?bytes);
+    tracing::debug!(headers = ?parts.headers);
+}
+
+async fn handler(BufferRequestBody(body): BufferRequestBody) {
+    tracing::debug!(?body, "handler received body");
+}
+
+// extractor that shows how to consume the request body upfront
+struct BufferRequestBody(Bytes);
+
+// we must implement `FromRequest` (and not `FromRequestParts`) to consume the body
+impl<S> FromRequest<S> for BufferRequestBody
+where
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let body = Bytes::from_request(req, state)
+            .await
+            .map_err(|err| err.into_response())?;
+
+        // do_thing_with_request_body(body.clone());
+
+        Ok(Self(body))
+    }
 }
 
 async fn redirect_http_to_https<F>(addrs: Addresses, signal: F)
@@ -182,7 +240,7 @@ where
 
     let addr = SocketAddr::from(addrs.http_addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::debug!("listening on {addr}");
+    tracing::debug!("listening on address: {addr}");
     axum::serve(listener, redirect.into_make_service())
         .with_graceful_shutdown(signal)
         .await
