@@ -104,11 +104,11 @@ while [[ "$(date -d "$DATE" +%Y%m%d)" -le "$(date -d "$enddate" +%Y%m%d)" ]]; do
         location=https://archive.sensor.community/$DATE/$file
 
         echo "Downloading $file"
-        curl -O $location
+        curl -O --connect-timeout 10 $location
 
         if [ ! -f "$file" ]; then
             echo "$file not found at $location"
-            exit 1
+            continue
         fi
 
         sed -i 's/;/,/g' $file
