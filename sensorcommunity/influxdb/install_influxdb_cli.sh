@@ -2,7 +2,7 @@
 
 echo -n "Install influx client"
 
-wget https://dl.influxdata.com/influxdb/releases/influxdb2-client-2.7.5-linux-amd64.tar.gz
+wget -q https://dl.influxdata.com/influxdb/releases/influxdb2-client-2.7.5-linux-amd64.tar.gz
 mkdir -p ./bin
 tar -C ./bin -xzf ./influxdb2-client-2.7.5-linux-amd64.tar.gz
 
