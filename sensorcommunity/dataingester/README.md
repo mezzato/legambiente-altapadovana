@@ -4,3 +4,6 @@
 2025-02-18T11:00:55.802412Z DEBUG request{method=POST uri=/digest version=HTTP/1.1}: started processing request
 2025-02-18T11:00:55.802490Z DEBUG request{method=POST uri=/digest version=HTTP/1.1}: handler received body body=b"{\"esp8266id\": \"15303512\", \"software_version\": \"NRZ-2024-135\", \"sensordatavalues\":[{\"value_type\":\"SDS_P1\",\"value\":\"27.60\"},{\"value_type\":\"SDS_P2\",\"value\":\"14.65\"},{\"value_type\":\"temperature\",\"value\":\"6.60\"},{\"value_type\":\"humidity\",\"value\":\"32.90\"},{\"value_type\":\"samples\",\"value\":\"5311057\"},{\"value_type\":\"min_micro\",\"value\":\"26\"},{\"value_type\":\"max_micro\",\"value\":\"363441\"},{\"value_type\":\"interval\",\"value\":\"145000\"},{\"value_type\":\"signal\",\"value\":\"-70\"}]}"
 2025-02-18T11:00:55.802524Z DEBUG request{method=POST uri=/digest version=HTTP/1.1}: finished processing request latency=0 ms status=200
+
+
+{"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}

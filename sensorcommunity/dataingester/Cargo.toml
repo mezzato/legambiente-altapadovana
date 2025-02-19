@@ -24,6 +24,7 @@ sha2 = "0.10"
 http-body-util = "0.1.0"
 tower-http = { version = "0.6.1", features = ["timeout", "trace"] }
 rustls = { version = "0.23.23", features = ["ring"] }
+serde_path_to_error = "0.1.16"
 
 
 [target.'cfg(not(windows))'.dependencies]

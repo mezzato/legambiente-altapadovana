@@ -4,7 +4,7 @@ mod logging;
 use crate::config::{crate_version, init_cli, Arg, Command};
 use axum::{
     body::{Body, Bytes},
-    extract::{FromRequest, FromRequestParts, Request},
+    extract::{rejection::JsonRejection, FromRequest, FromRequestParts, Request},
     handler::HandlerWithoutStateExt,
     http::{request::Parts, uri::Authority, HeaderMap, StatusCode, Uri},
     middleware::{self, Next},
@@ -21,7 +21,7 @@ use axum_server::tls_rustls::RustlsConfig;
 use http_body_util::BodyExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::fmt::Display;
+use std::{fmt::Display, io::Error};
 use std::{future::Future, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::signal;
 use tower_http::timeout::TimeoutLayer;
@@ -87,12 +87,10 @@ async fn main() {
             .await
             .unwrap();
     } else {
-
-
         rustls::crypto::ring::default_provider()
             .install_default()
             .expect("Failed to install default CryptoProvider");
-        
+
         let https_addr: SocketAddr = config.https_addr.parse().unwrap();
         let addresses = Addresses {
             http_addr,
@@ -122,7 +120,6 @@ async fn main() {
         )
         })
         .unwrap();
-
 
         // run https server
         tracing::debug!("listening on TLS address: {}", addresses.https_addr);
@@ -162,16 +159,24 @@ async fn shutdown_signal(handle: axum_server::Handle) {
                                                              // to force shutdown
 }
 
+// {"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Payload {
-    // software_version: String,
+    software_version: String,
+    sensordatavalues: Vec<SensorValue>,
 }
 
-async fn handler(SensorData { json, sensor }: SensorData<Payload>) -> &'static str {
-    tracing::debug!(?sensor, "sensor");
-    tracing::debug!(?json, "json body");
-    println!("---- HIT ----");
-    "Hello, World!"
+#[derive(Debug, Serialize, Deserialize)]
+struct SensorValue {
+    value_type: String,
+    value: String,
+}
+
+async fn handler(SensorData { json, sensor }: SensorData<Payload>) {
+    // tracing::debug!(?sensor, "sensor");
+    // tracing::debug!(?json, "json body");
+    println!("sensor: {}, json: {:?}", sensor, json);
 }
 
 // extractor that shows how to consume the request body upfront
@@ -199,12 +204,53 @@ where
         let sensor_header = req.headers().get(X_SENSOR_HEADER);
         let sensor = sensor_header.and_then(|value| value.to_str().ok());
         let sensor = sensor.unwrap_or_default().to_owned();
-
-        let Json(json) = req.extract().await.map_err(IntoResponse::into_response)?;
+        let Json(json) = req.extract().await.map_err(|err| {
+            let resp = IntoResponse::into_response(err);
+            println!("{:?}", resp);
+            resp
+        })?;
 
         let data = SensorData { json, sensor };
 
         Ok(data)
+    }
+}
+
+// attempt to extract the inner `serde_path_to_error::Error<serde_json::Error>`,
+// if that succeeds we can provide a more specific error.
+//
+// `Json` uses `serde_path_to_error` so the error will be wrapped in `serde_path_to_error::Error`.
+fn serde_json_error_response<E>(err: E) -> (StatusCode, String)
+where
+    E: std::error::Error + 'static,
+{
+    if let Some(err) = find_error_source::<serde_path_to_error::Error<serde_json::Error>>(&err) {
+        let serde_json_err = err.inner();
+        (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Invalid JSON at line {} column {}",
+                serde_json_err.line(),
+                serde_json_err.column()
+            ),
+        )
+    } else {
+        (StatusCode::BAD_REQUEST, "Unknown error".to_string())
+    }
+}
+
+// attempt to downcast `err` into a `T` and if that fails recursively try and
+// downcast `err`'s source
+fn find_error_source<'a, T>(err: &'a (dyn std::error::Error + 'static)) -> Option<&'a T>
+where
+    T: std::error::Error + 'static,
+{
+    if let Some(err) = err.downcast_ref::<T>() {
+        Some(err)
+    } else if let Some(source) = err.source() {
+        find_error_source(source)
+    } else {
+        None
     }
 }
 
