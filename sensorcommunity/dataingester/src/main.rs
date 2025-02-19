@@ -4,19 +4,28 @@ mod logging;
 use crate::config::{crate_version, init_cli, Arg, Command};
 use axum::{
     body::{Body, Bytes},
-    extract::{FromRequest, Request},
+    extract::{FromRequest, FromRequestParts, Request},
     handler::HandlerWithoutStateExt,
-    http::{request::Parts, uri::Authority, StatusCode, Uri},
+    http::{request::Parts, uri::Authority, HeaderMap, StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::post,
-    BoxError, Router,
+    BoxError, Json, RequestExt, RequestPartsExt, Router,
 };
 use axum_extra::extract::Host;
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
 use axum_server::tls_rustls::RustlsConfig;
 use http_body_util::BodyExt;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::fmt::Display;
 use std::{future::Future, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::signal;
+use tower_http::timeout::TimeoutLayer;
+use tower_http::trace::TraceLayer;
 
 pub const MANIFEST_NAME: &str = "dataingester.toml";
 
@@ -28,16 +37,6 @@ struct Addresses {
 
 #[tokio::main]
 async fn main() {
-    /*
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-    */
-
     let matches = Command::new("dataingester")
         .version(crate_version!())
         .author("Legambiente")
@@ -66,33 +65,53 @@ async fn main() {
 
     tracing::debug!("working directory: {}", ctx.working_dir.display());
 
-    let http_addr: SocketAddr = config.http_addr.parse().unwrap();
-    let https_addr: SocketAddr = config.https_addr.parse().unwrap();
-
-    let addresses = Addresses {
-        http_addr,
-        https_addr,
-    };
+    let http_addr: SocketAddr = config.http_addr.trim().parse().unwrap();
 
     //Create a handle for our TLS server so the shutdown signal can all shutdown
     let handle = axum_server::Handle::new();
     //save the future for easy shutting down of redirect server
     let shutdown_future = shutdown_signal(handle.clone());
 
-    // optional: spawn a second server to redirect http requests to this server
-    tokio::spawn(redirect_http_to_https(addresses, shutdown_future));
+    let app = Router::new().route("/write", post(handler));
+    //.layer(middleware::from_fn(print_request_body));
 
-    let tls_dir = PathBuf::from(
-        shellexpand::env(&config.tls_dir.as_os_str().to_string_lossy())
-            .unwrap()
-            .as_ref(),
-    );
+    let https_addr = config.https_addr.trim();
+    if https_addr.is_empty() {
+        let addr = SocketAddr::from(http_addr);
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        tracing::info!("listening on address: {}", addr);
 
-    const CERT_FILE: &str = "cert.pem";
-    const KEY_FILE: &str = "key.pem";
+        // Run the server with graceful shutdown
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_future)
+            .await
+            .unwrap();
+    } else {
 
-    // configure certificate and private key used by https
-    let config = RustlsConfig::from_pem_file(tls_dir.join(CERT_FILE), tls_dir.join(KEY_FILE))
+
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install default CryptoProvider");
+        
+        let https_addr: SocketAddr = config.https_addr.parse().unwrap();
+        let addresses = Addresses {
+            http_addr,
+            https_addr,
+        };
+        // optional: spawn a second server to redirect http requests to this server
+        tokio::spawn(redirect_http_to_https(addresses, shutdown_future));
+
+        let tls_dir = PathBuf::from(
+            shellexpand::env(&config.tls_dir.as_os_str().to_string_lossy())
+                .unwrap()
+                .as_ref(),
+        );
+
+        const CERT_FILE: &str = "cert.pem";
+        const KEY_FILE: &str = "key.pem";
+
+        // configure certificate and private key used by https
+        let config = RustlsConfig::from_pem_file(tls_dir.join(CERT_FILE), tls_dir.join(KEY_FILE))
         .await
         .map_err(|e| {
             format!(
@@ -104,17 +123,15 @@ async fn main() {
         })
         .unwrap();
 
-    let app = Router::new()
-        .route("/digest", post(handler))
-        .layer(middleware::from_fn(print_request_body));
 
-    // run https server
-    tracing::debug!("listening on TLS address: {}", addresses.https_addr);
-    axum_server::bind_rustls(addresses.https_addr, config)
-        .handle(handle)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+        // run https server
+        tracing::debug!("listening on TLS address: {}", addresses.https_addr);
+        axum_server::bind_rustls(addresses.https_addr, config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    }
 }
 
 async fn shutdown_signal(handle: axum_server::Handle) {
@@ -145,58 +162,92 @@ async fn shutdown_signal(handle: axum_server::Handle) {
                                                              // to force shutdown
 }
 
-// middleware that shows how to consume the request body upfront
-async fn print_request_body(request: Request, next: Next) -> Result<impl IntoResponse, Response> {
-    let request = buffer_request_body(request).await?;
-
-    Ok(next.run(request).await)
+#[derive(Debug, Serialize, Deserialize)]
+struct Payload {
+    // software_version: String,
 }
 
-// the trick is to take the request apart, buffer the body, do what you need to do, then put
-// the request back together
-async fn buffer_request_body(request: Request) -> Result<Request, Response> {
-    let (parts, body) = request.into_parts();
-
-    // this won't work if the body is an long running stream
-    let bytes = body
-        .collect()
-        .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
-        .to_bytes();
-
-    do_thing_with_request_body(bytes.clone(), parts.clone());
-
-    Ok(Request::from_parts(parts, Body::from(bytes)))
-}
-
-fn do_thing_with_request_body(bytes: Bytes, parts: Parts) {
-    tracing::debug!(body = ?bytes);
-    tracing::debug!(headers = ?parts.headers);
-}
-
-async fn handler(BufferRequestBody(body): BufferRequestBody) {
-    tracing::debug!(?body, "handler received body");
+async fn handler(SensorData { json, sensor }: SensorData<Payload>) -> &'static str {
+    tracing::debug!(?sensor, "sensor");
+    tracing::debug!(?json, "json body");
+    println!("---- HIT ----");
+    "Hello, World!"
 }
 
 // extractor that shows how to consume the request body upfront
-struct BufferRequestBody(Bytes);
+// struct BufferRequestBody(Bytes);
 
-// we must implement `FromRequest` (and not `FromRequestParts`) to consume the body
-impl<S> FromRequest<S> for BufferRequestBody
+const X_SENSOR_HEADER: &str = "x-sensor";
+
+struct SensorData<T> {
+    json: T,
+    sensor: String,
+}
+
+impl<S, T> FromRequest<S> for SensorData<T>
 where
     S: Send + Sync,
+    Json<T>: FromRequest<()>,
+    T: 'static,
 {
     type Rejection = Response;
 
-    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        let body = Bytes::from_request(req, state)
-            .await
-            .map_err(|err| err.into_response())?;
+    async fn from_request(req: Request, _state: &S) -> Result<Self, Self::Rejection> {
+        tracing::debug!(request = ?req);
 
-        // do_thing_with_request_body(body.clone());
+        // Extract the token from the authorization header
+        let sensor_header = req.headers().get(X_SENSOR_HEADER);
+        let sensor = sensor_header.and_then(|value| value.to_str().ok());
+        let sensor = sensor.unwrap_or_default().to_owned();
 
-        Ok(Self(body))
+        let Json(json) = req.extract().await.map_err(IntoResponse::into_response)?;
+
+        let data = SensorData { json, sensor };
+
+        Ok(data)
     }
+}
+
+impl IntoResponse for AuthError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
+            AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
+            AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
+            AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
+        };
+        let body = Json(json!({
+            "error": error_message,
+        }));
+        (status, body).into_response()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    company: String,
+    exp: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct AuthBody {
+    access_token: String,
+    token_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AuthPayload {
+    client_id: String,
+    client_secret: String,
+}
+
+#[derive(Debug)]
+enum AuthError {
+    WrongCredentials,
+    MissingCredentials,
+    TokenCreation,
+    InvalidToken,
 }
 
 async fn redirect_http_to_https<F>(addrs: Addresses, signal: F)
@@ -209,7 +260,7 @@ where
         parts.scheme = Some(axum::http::uri::Scheme::HTTPS);
 
         if parts.path_and_query.is_none() {
-            parts.path_and_query = Some("/".parse().unwrap());
+            parts.path_and_query = Some("/write".parse().unwrap());
         }
 
         let authority: Authority = host.parse()?;
@@ -240,7 +291,11 @@ where
 
     let addr = SocketAddr::from(addrs.http_addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::debug!("listening on address: {addr}");
+    tracing::debug!(
+        "listening on address: {}, redirecting to address: {}",
+        addr,
+        addrs.https_addr
+    );
     axum::serve(listener, redirect.into_make_service())
         .with_graceful_shutdown(signal)
         .await
