@@ -103,7 +103,7 @@ while [[ "$(date -d "$DATE" +%Y%m%d)" -le "$(date -d "$enddate" +%Y%m%d)" ]]; do
         file="${DATE}_${sensor_type}_sensor_${sensor_id}.csv"
         location=https://archive.sensor.community/$DATE/$file
 
-        echo "Downloading $file"
+        echo "Downloading $location"
         curl -O --connect-timeout 10 $location
 
         if [ ! -f "$file" ]; then
