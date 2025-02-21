@@ -469,16 +469,16 @@ impl<S: SuffixScheme> FileRotate<S> {
         let existing_suffix_info = self.suffixes.get(&new_suffix_info).cloned();
 
         // Move destination file out of the way if it exists
-        let newly_created_suffix = if let Some(existing_suffix_info) = existing_suffix_info {
+        let newly_created_suffix = match existing_suffix_info { Some(existing_suffix_info) => {
             // We might move files in a way that the destination path doesn't equal the path that
             // was replaced. Due to possible `.gz`, a "conflicting" file doesn't mean that paths
             // are equal.
             self.suffixes.replace(new_suffix_info);
             // Recurse to move conflicting file.
             self.move_file_with_suffix(Some(existing_suffix_info))?
-        } else {
+        } _ => {
             new_suffix_info
-        };
+        }};
 
         let old_path = match old_suffix_info {
             Some(suffix) => suffix.to_path(&self.basepath),

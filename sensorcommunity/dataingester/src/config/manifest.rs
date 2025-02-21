@@ -1,9 +1,8 @@
-use crate::config::hostname::{self, gethostname};
+use crate::config::hostname;
 use crate::logging;
 use anyhow::Context;
 use chrono::prelude::*;
 use digest::Digest;
-use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2;
 use std::fs;
