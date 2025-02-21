@@ -2,3 +2,4 @@ mirror/
 config.toml
 config.json
 .venv
+bin

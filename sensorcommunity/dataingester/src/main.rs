@@ -3,29 +3,20 @@ mod logging;
 
 use crate::config::{crate_version, init_cli, Arg, Command};
 use axum::{
-    body::{Body, Bytes},
-    extract::{rejection::JsonRejection, FromRequest, FromRequestParts, Request},
+    extract::{rejection::JsonRejection, FromRequest, Request},
     handler::HandlerWithoutStateExt,
-    http::{request::Parts, uri::Authority, HeaderMap, StatusCode, Uri},
-    middleware::{self, Next},
-    response::{IntoResponse, Redirect, Response},
+    http::{uri::Authority, StatusCode, Uri},
+    response::Redirect,
     routing::post,
-    BoxError, Json, RequestExt, RequestPartsExt, Router,
+    BoxError, Json, RequestPartsExt, Router,
 };
 use axum_extra::extract::Host;
-use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    TypedHeader,
-};
 use axum_server::tls_rustls::RustlsConfig;
-use http_body_util::BodyExt;
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{fmt::Display, io::Error};
 use std::{future::Future, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::signal;
-use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::TraceLayer;
 
 pub const MANIFEST_NAME: &str = "dataingester.toml";
 
@@ -193,107 +184,63 @@ impl<S, T> FromRequest<S> for SensorData<T>
 where
     S: Send + Sync,
     Json<T>: FromRequest<()>,
+    axum::Json<T>: FromRequest<S, Rejection = JsonRejection>,
     T: 'static,
 {
-    type Rejection = Response;
+    type Rejection = (StatusCode, axum::Json<serde_json::Value>);
 
-    async fn from_request(req: Request, _state: &S) -> Result<Self, Self::Rejection> {
-        tracing::debug!(request = ?req);
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        // tracing::debug!(request = ?req);
 
         // Extract the token from the authorization header
         let sensor_header = req.headers().get(X_SENSOR_HEADER);
         let sensor = sensor_header.and_then(|value| value.to_str().ok());
         let sensor = sensor.unwrap_or_default().to_owned();
+        /*
         let Json(json) = req.extract().await.map_err(|err| {
             let resp = IntoResponse::into_response(err);
             println!("{:?}", resp);
             resp
         })?;
+        */
+
+        let (mut parts, body) = req.into_parts();
+
+        tracing::debug!(headers = ?parts.headers);
+        // tracing::debug!(body = ?body);
+
+        // We can use other extractors to provide better rejection messages.
+        // For example, here we are using `axum::extract::MatchedPath` to
+        // provide a better error message.
+        //
+        // Have to run that first since `Json` extraction consumes the request.
+        let path = parts
+            .extract::<axum::extract::MatchedPath>()
+            .await
+            .map(|path| path.as_str().to_owned())
+            .ok();
+
+        let req = Request::from_parts(parts, body);
+
+        let json = match axum::Json::<T>::from_request(req, state).await {
+            Ok(value) => Ok(value.0),
+            // convert the error from `axum::Json` into whatever we want
+            Err(rejection) => {
+                // println!("--- rejection: {}", rejection.body_text());
+                let payload = json!({
+                    "message": rejection.body_text(),
+                    "origin": "custom_extractor",
+                    "path": path,
+                });
+
+                Err((rejection.status(), axum::Json(payload)))
+            }
+        }?;
 
         let data = SensorData { json, sensor };
 
         Ok(data)
     }
-}
-
-// attempt to extract the inner `serde_path_to_error::Error<serde_json::Error>`,
-// if that succeeds we can provide a more specific error.
-//
-// `Json` uses `serde_path_to_error` so the error will be wrapped in `serde_path_to_error::Error`.
-fn serde_json_error_response<E>(err: E) -> (StatusCode, String)
-where
-    E: std::error::Error + 'static,
-{
-    if let Some(err) = find_error_source::<serde_path_to_error::Error<serde_json::Error>>(&err) {
-        let serde_json_err = err.inner();
-        (
-            StatusCode::BAD_REQUEST,
-            format!(
-                "Invalid JSON at line {} column {}",
-                serde_json_err.line(),
-                serde_json_err.column()
-            ),
-        )
-    } else {
-        (StatusCode::BAD_REQUEST, "Unknown error".to_string())
-    }
-}
-
-// attempt to downcast `err` into a `T` and if that fails recursively try and
-// downcast `err`'s source
-fn find_error_source<'a, T>(err: &'a (dyn std::error::Error + 'static)) -> Option<&'a T>
-where
-    T: std::error::Error + 'static,
-{
-    if let Some(err) = err.downcast_ref::<T>() {
-        Some(err)
-    } else if let Some(source) = err.source() {
-        find_error_source(source)
-    } else {
-        None
-    }
-}
-
-impl IntoResponse for AuthError {
-    fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
-            AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
-            AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
-            AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
-        };
-        let body = Json(json!({
-            "error": error_message,
-        }));
-        (status, body).into_response()
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    sub: String,
-    company: String,
-    exp: usize,
-}
-
-#[derive(Debug, Serialize)]
-struct AuthBody {
-    access_token: String,
-    token_type: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct AuthPayload {
-    client_id: String,
-    client_secret: String,
-}
-
-#[derive(Debug)]
-enum AuthError {
-    WrongCredentials,
-    MissingCredentials,
-    TokenCreation,
-    InvalidToken,
 }
 
 async fn redirect_http_to_https<F>(addrs: Addresses, signal: F)

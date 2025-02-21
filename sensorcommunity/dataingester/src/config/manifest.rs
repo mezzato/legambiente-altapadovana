@@ -1,21 +1,21 @@
+use crate::config::hostname::{self, gethostname};
 use crate::logging;
 use anyhow::Context;
+use chrono::prelude::*;
+use digest::Digest;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use sha2;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{reload, EnvFilter};
-use chrono::prelude::*;
-use digest::Digest;
-use sha2;
-use crate::config::hostname;
 
 static DEFAULT_LOG_FILE_PATH: &str = "$HOME/.config/dataingester/log.txt";
 static DEFAULT_PERF_ADDR: &str = "0.0.0.0:4000";
 static DEFAULT_HTTP_ADDR: &str = "0.0.0.0:7878";
 static DEFAULT_HTTPS_ADDR: &str = "0.0.0.0:3878";
-
 
 // Toy example, do not use it in practice!
 // Instead use crates from: https://github.com/RustCrypto/password-hashing
@@ -40,13 +40,11 @@ pub struct Manifest {
     pub perf: PerfConfig,
     pub logging: Logging,
     #[serde(default)]
-    pub username: String,
-    #[serde(default)]
-    pub password: String,
-    #[serde(default)]
     pub http_addr: String,
     #[serde(default)]
     pub https_addr: String,
+    pub influxdb: InfluxDB,
+    pub logins: Vec<Login>,
 }
 
 impl Manifest {
@@ -57,23 +55,35 @@ impl Manifest {
         let mut manifest: Manifest = Default::default();
         manifest.path = PathBuf::from(path);
         manifest.tls_dir = PathBuf::from("tls");
-        manifest.username = "user".to_string();
         manifest.http_addr = DEFAULT_HTTP_ADDR.to_string();
         manifest.https_addr = DEFAULT_HTTPS_ADDR.to_string();
 
         let mut buf = [0u8; 32];
         // Create a normal DateTime from the NaiveDateTime
         let datetime = Utc::now().format("%Y-%m-%d %H:%M:%S");
+
+        // Get an RNG:
         
-        let hostname = hostname::gethostname();
-        hash_password::<sha2::Sha256>(&datetime.to_string(), &hostname.to_string_lossy(), &mut buf);
+        use rand::distr::{Alphanumeric, SampleString};
+        let salt = Alphanumeric.sample_string(&mut rand::rng(), 16);
+        let salt = salt + &hostname::gethostname().to_string_lossy();
 
-        let hex : String = buf.iter()
-        .map(|b| format!("{:x}", b).to_string())
-        .collect::<Vec<String>>()
-        .join("");
+        hash_password::<sha2::Sha256>(&datetime.to_string(), &salt, &mut buf);
 
-        manifest.password = hex;
+        let hex: String = buf
+            .iter()
+            .map(|b| format!("{:x}", b).to_string())
+            .collect::<Vec<String>>()
+            .join("");
+
+        manifest.logins.push(Login {
+            username: "myuserA".to_owned(),
+            password: hex.clone() + "_A",
+        });
+        manifest.logins.push(Login {
+            username: "myuserB".to_owned(),
+            password: hex + "_B",
+        });
         let guard = manifest.logging.setup()?;
         Ok((manifest, guard))
     }
@@ -104,21 +114,6 @@ impl Manifest {
         }
 
         Ok(())
-    }
-}
-
-impl Default for Logging {
-    fn default() -> Self {
-        Logging {
-            log_to_stderr: true,
-            filename: PathBuf::from_str(DEFAULT_LOG_FILE_PATH).unwrap(),
-            max_size_mb: 10,
-            max_backups: 10,
-            max_age_days: 30,
-            compress: false,
-            level: "ERROR".to_string(),
-            reload_fn: ReloadFn(None),
-        }
     }
 }
 
@@ -160,6 +155,21 @@ pub struct Logging {
 
     #[serde(skip_serializing, skip_deserializing)]
     reload_fn: ReloadFn,
+}
+
+impl Default for Logging {
+    fn default() -> Self {
+        Logging {
+            log_to_stderr: true,
+            filename: PathBuf::from_str(DEFAULT_LOG_FILE_PATH).unwrap(),
+            max_size_mb: 10,
+            max_backups: 10,
+            max_age_days: 30,
+            compress: false,
+            level: "ERROR".to_string(),
+            reload_fn: ReloadFn(None),
+        }
+    }
 }
 
 impl Logging {
@@ -231,7 +241,6 @@ impl Logging {
     }
 }
 
-
 impl Default for PerfConfig {
     fn default() -> Self {
         PerfConfig {
@@ -247,6 +256,43 @@ pub struct PerfConfig {
     pub enabled: bool,
     #[serde(rename = "perf-addr", default)]
     pub perf_addr: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Login {
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+}
+
+impl Default for InfluxDB {
+    fn default() -> Self {
+        InfluxDB {
+            server: "".to_owned(),
+            path: "write?db=mydb".to_owned(),
+            port: 8086,
+            username: "myuser".to_owned(),
+            password: "mypassword".to_owned(),
+            measurement: "particulate".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InfluxDB {
+    #[serde(default)]
+    pub server: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub port: i32,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub measurement: String,
 }
 
 #[cfg(test)]
