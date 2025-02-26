@@ -1,5 +1,6 @@
 sensor_id,sensor_type,chip_id,city
 59571,SDS011,,Camporovere
+88089,SDS011,,Camposampiero
 78027,SDS011,,Canove
 62574,SDS011,esp8266-15303512,Carmignano di Brenta
 62575,DHT22,esp8266-15303512,Carmignano di Brenta
