@@ -26,6 +26,8 @@ tower-http = { version = "0.6.1", features = ["timeout", "trace"] }
 rustls = { version = "0.23.23", features = ["ring"] }
 serde_path_to_error = "0.1.16"
 rand = "0.9.0"
+csv = "1.3.1"
+notify = "8.0.0"
 
 
 [target.'cfg(not(windows))'.dependencies]

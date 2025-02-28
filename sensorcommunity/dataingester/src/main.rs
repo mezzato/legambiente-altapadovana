@@ -1,29 +1,53 @@
+mod cache;
 mod config;
 mod logging;
+mod sensor_data;
 
-use crate::config::{crate_version, init_cli, Arg, Command};
+use crate::config::{Arg, Command, crate_version, init_cli};
 use axum::{
-    extract::{rejection::JsonRejection, FromRequest, Request},
+    BoxError, Json, RequestPartsExt, Router,
+    extract::{FromRequest, Request, State, rejection::JsonRejection},
     handler::HandlerWithoutStateExt,
-    http::{uri::Authority, StatusCode, Uri},
+    http::{StatusCode, Uri, uri::Authority},
     response::Redirect,
     routing::post,
-    BoxError, Json, RequestPartsExt, Router,
 };
 use axum_extra::extract::Host;
 use axum_server::tls_rustls::RustlsConfig;
+use cache::Cache;
 
+use crate::cache::{CacheKey, load_cache};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{future::Future, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{collections::HashMap, future::Future, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::signal;
 
 pub const MANIFEST_NAME: &str = "dataingester.toml";
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChipInfo {
+    pub chip_id: String,
+    pub city: String,
+    pub description: String,
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl CacheKey for ChipInfo {
+    fn id(&self) -> String {
+        self.chip_id.clone()
+    }
+}
 
 #[derive(Clone, Copy)]
 struct Addresses {
     http_addr: SocketAddr,
     https_addr: SocketAddr,
+}
+
+pub struct SensorData<T> {
+    json: T,
+    sensor: String,
 }
 
 #[tokio::main]
@@ -56,6 +80,16 @@ async fn main() {
 
     tracing::debug!("working directory: {}", ctx.working_dir.display());
 
+    // load chip cache with hot reload
+    let (chip_cache, _watcher) =
+        match load_cache::<ChipInfo>(&config.chips_filepath.as_os_str().to_string_lossy()) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("could not load the chip info cache: {}", e);
+                return;
+            }
+        };
+
     let http_addr: SocketAddr = config.http_addr.trim().parse().unwrap();
 
     //Create a handle for our TLS server so the shutdown signal can all shutdown
@@ -63,7 +97,11 @@ async fn main() {
     //save the future for easy shutting down of redirect server
     let shutdown_future = shutdown_signal(handle.clone());
 
-    let app = Router::new().route("/write", post(handler));
+    let app = Router::new().route("/write", post(handler)).with_state((
+        chip_cache,
+        config.sensor_data_dir,
+        config.measure_name_to_field,
+    ));
     //.layer(middleware::from_fn(print_request_body));
 
     let https_addr = config.https_addr.trim();
@@ -147,38 +185,82 @@ async fn shutdown_signal(handle: axum_server::Handle) {
 
     tracing::info!("Received termination signal shutting down");
     handle.graceful_shutdown(Some(Duration::from_secs(10))); // 10 secs is how long docker will wait
-                                                             // to force shutdown
+    // to force shutdown
 }
 
 // {"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Payload {
-    software_version: String,
-    sensordatavalues: Vec<SensorValue>,
-}
+async fn handler(
+    State((chip_info_cache, sensor_data_dir, measure_name_to_field)): State<(
+        Cache<ChipInfo>,
+        PathBuf,
+        HashMap<String, String>,
+    )>,
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SensorValue {
-    value_type: String,
-    value: String,
-}
-
-async fn handler(SensorData { json, sensor }: SensorData<Payload>) {
+    SensorData { json, sensor }: SensorData<sensor_data::Payload>,
+) {
     // tracing::debug!(?sensor, "sensor");
     // tracing::debug!(?json, "json body");
-    println!("sensor: {}, json: {:?}", sensor, json);
+    // println!("sensor: {}, json: {:?}", sensor, json);
+
+    let formatted_day = format!("{}", chrono::Utc::now().format("%Y-%m-%d"));
+    let root_folder = sensor_data_dir.join(&formatted_day);
+    let file_name = format!("{}_chip_{}.csv", &formatted_day, &sensor);
+
+    if let Err(e) = std::fs::create_dir_all(&root_folder) {
+        tracing::error!(
+            "Error creating sensor data folder at: {}, {}",
+            sensor_data_dir.as_os_str().to_string_lossy(),
+            e
+        );
+        return;
+    }
+
+    let file_path = sensor_data_dir.join(file_name);
+
+    match sensor_data::write_to_csv(
+        &file_path,
+        &measure_name_to_field,
+        chip_info_cache,
+        &sensor,
+        json,
+    )
+    .await
+    {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!(
+                "Error trying to write csv file at: {}, {}",
+                file_path.as_os_str().to_string_lossy(),
+                e
+            );
+            return;
+        }
+    };
+
+    /*
+    wtr.write_record(&[
+        "Time",
+        ;durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
+    ])?;
+    wtr.write_record(&[
+        "Davidsons Landing",
+        "AK",
+        "",
+        "65.2419444",
+        "-165.2716667",
+    ])?;
+    wtr.write_record(&["Kenai", "AK", "7610", "60.5544444", "-151.2583333"])?;
+    wtr.write_record(&["Oakman", "AL", "", "33.7133333", "-87.3886111"])?;
+
+    wtr.flush()?;
+    */
 }
 
 // extractor that shows how to consume the request body upfront
 // struct BufferRequestBody(Bytes);
 
 const X_SENSOR_HEADER: &str = "x-sensor";
-
-struct SensorData<T> {
-    json: T,
-    sensor: String,
-}
 
 impl<S, T> FromRequest<S> for SensorData<T>
 where

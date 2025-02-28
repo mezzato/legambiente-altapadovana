@@ -5,11 +5,12 @@ use chrono::prelude::*;
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::{reload, EnvFilter};
+use tracing_subscriber::{EnvFilter, reload};
 
 static DEFAULT_LOG_FILE_PATH: &str = "$HOME/.config/dataingester/log.txt";
 static DEFAULT_PERF_ADDR: &str = "0.0.0.0:4000";
@@ -36,6 +37,10 @@ pub struct Manifest {
     pub path: PathBuf,
     #[serde(default)]
     pub tls_dir: PathBuf,
+    #[serde(default)]
+    pub chips_filepath: PathBuf,
+    #[serde(default)]
+    pub sensor_data_dir: PathBuf,
     pub perf: PerfConfig,
     pub logging: Logging,
     #[serde(default)]
@@ -44,6 +49,7 @@ pub struct Manifest {
     pub https_addr: String,
     pub influxdb: InfluxDB,
     pub logins: Vec<Login>,
+    pub measure_name_to_field: HashMap<String, String>,
 }
 
 impl Manifest {
@@ -54,6 +60,10 @@ impl Manifest {
         let mut manifest: Manifest = Default::default();
         manifest.path = PathBuf::from(path);
         manifest.tls_dir = PathBuf::from("tls");
+        manifest.chips_filepath = PathBuf::from("chips.csv");
+        manifest.sensor_data_dir = PathBuf::from("./sensor_data");
+        // manifest.sensors_filepath = PathBuf::from("sensors.csv");
+        
         manifest.http_addr = DEFAULT_HTTP_ADDR.to_string();
         manifest.https_addr = DEFAULT_HTTPS_ADDR.to_string();
 
@@ -62,7 +72,7 @@ impl Manifest {
         let datetime = Utc::now().format("%Y-%m-%d %H:%M:%S");
 
         // Get an RNG:
-        
+
         use rand::distr::{Alphanumeric, SampleString};
         let salt = Alphanumeric.sample_string(&mut rand::rng(), 16);
         let salt = salt + &hostname::gethostname().to_string_lossy();
@@ -83,6 +93,18 @@ impl Manifest {
             username: "myuserB".to_owned(),
             password: hex + "_B",
         });
+
+        let hash = &mut manifest.measure_name_to_field;
+        hash.insert("SDS_P1".to_owned(), "P1".to_owned());
+        hash.insert("SDS_P2".to_owned(), "P2".to_owned());
+        hash.insert("temperature".to_owned(), "temperature".to_owned());
+        hash.insert("humidity".to_owned(), "humidity".to_owned());
+        hash.insert("BMP_temperature".to_owned(), "temperature".to_owned());
+        hash.insert("BMP_pressure".to_owned(), "pressure".to_owned());
+        hash.insert("BME280_temperature".to_owned(), "temperature".to_owned());
+        hash.insert("BME280_humidity".to_owned(), "humidity".to_owned());
+        hash.insert("BME280_pressure".to_owned(), "pressure".to_owned());
+
         let guard = manifest.logging.setup()?;
         Ok((manifest, guard))
     }
