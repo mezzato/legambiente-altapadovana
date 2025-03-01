@@ -101,6 +101,7 @@ async fn main() {
         chip_cache,
         config.sensor_data_dir,
         config.measure_name_to_field,
+        config.influxdb,
     ));
     //.layer(middleware::from_fn(print_request_body));
 
@@ -191,10 +192,11 @@ async fn shutdown_signal(handle: axum_server::Handle) {
 // {"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}
 
 async fn handler(
-    State((chip_info_cache, sensor_data_dir, measure_name_to_field)): State<(
+    State((chip_info_cache, sensor_data_dir, measure_name_to_field, influxdb_settings)): State<(
         Cache<ChipInfo>,
         PathBuf,
         HashMap<String, String>,
+        config::InfluxDB,
     )>,
 
     SensorData { json, sensor }: SensorData<sensor_data::Payload>,
@@ -218,7 +220,8 @@ async fn handler(
 
     let file_path = sensor_data_dir.join(file_name);
 
-    match sensor_data::write_to_csv(
+    match sensor_data::write(
+        &influxdb_settings,
         &file_path,
         &measure_name_to_field,
         chip_info_cache,
@@ -230,11 +233,10 @@ async fn handler(
         Ok(_) => {}
         Err(e) => {
             tracing::error!(
-                "Error trying to write csv file at: {}, {}",
-                file_path.as_os_str().to_string_lossy(),
+                "Error trying to write data for sensor {}: {}",
+                &sensor,
                 e
             );
-            return;
         }
     };
 

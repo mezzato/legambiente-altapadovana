@@ -290,28 +290,25 @@ pub struct Login {
 impl Default for InfluxDB {
     fn default() -> Self {
         InfluxDB {
-            server: "".to_owned(),
-            path: "write?db=mydb".to_owned(),
-            port: 8086,
-            username: "myuser".to_owned(),
-            password: "mypassword".to_owned(),
-            measurement: "particulate".to_owned(),
+            url: "".to_owned(),
+            token: "".to_owned(),
+            org: "".to_owned(),
+            bucket: "mypassword".to_owned(),
+            measurement: "".to_owned(),
         }
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InfluxDB {
     #[serde(default)]
-    pub server: String,
+    pub url: String,
     #[serde(default)]
-    pub path: String,
+    pub token: String,
     #[serde(default)]
-    pub port: i32,
+    pub org: String,
     #[serde(default)]
-    pub username: String,
-    #[serde(default)]
-    pub password: String,
+    pub bucket: String,
     #[serde(default)]
     pub measurement: String,
 }
