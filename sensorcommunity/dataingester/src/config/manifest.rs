@@ -61,7 +61,7 @@ impl Manifest {
         manifest.path = PathBuf::from(path);
         manifest.tls_dir = PathBuf::from("tls");
         manifest.chips_filepath = PathBuf::from("chips.csv");
-        manifest.sensor_data_dir = PathBuf::from("./sensor_data");
+        manifest.sensor_data_dir = PathBuf::from("./chip_data");
         // manifest.sensors_filepath = PathBuf::from("sensors.csv");
         
         manifest.http_addr = DEFAULT_HTTP_ADDR.to_string();
