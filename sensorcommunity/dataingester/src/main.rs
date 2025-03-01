@@ -218,7 +218,7 @@ async fn handler(
         return;
     }
 
-    let file_path = sensor_data_dir.join(file_name);
+    let file_path = root_folder.join(file_name);
 
     match sensor_data::write(
         &influxdb_settings,
