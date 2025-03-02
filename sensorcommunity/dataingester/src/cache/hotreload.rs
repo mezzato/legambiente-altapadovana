@@ -1,10 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use notify::{Error, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-
 
 pub trait CacheKey {
     fn id(&self) -> String;
@@ -53,6 +51,9 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
     let cloned_config = Arc::clone(&config);
 
     let cloned_path = path.to_owned();
+
+    let conf = notify::Config::default();
+
     // We listen to file changes by giving Notify
     // a function that will get called when events happen
     let mut watcher =
@@ -73,8 +74,8 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
                     },
                 }
             }
-        },notify::Config::default())?;
+        },conf)?;
 
-    watcher.watch(Path::new(path), RecursiveMode::NonRecursive)?;
+    watcher.watch(Path::new(path), RecursiveMode::Recursive)?;
     Ok((config, watcher))
 }

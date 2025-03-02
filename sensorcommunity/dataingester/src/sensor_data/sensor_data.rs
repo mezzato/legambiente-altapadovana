@@ -1,10 +1,9 @@
 use std::{collections::HashMap, fs::OpenOptions, io::Seek};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::cache::Cache;
-use futures::prelude::*;
 
 // "Time", durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
 // chip_id;lat;lon;timestamp;P1;durP1;ratioP1;P2;durP2;ratioP2;temperature;humidity;pressure;signal

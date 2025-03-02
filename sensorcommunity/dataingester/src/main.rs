@@ -1,3 +1,4 @@
+mod http;
 mod cache;
 mod config;
 mod logging;
@@ -5,20 +6,20 @@ mod sensor_data;
 
 use crate::config::{Arg, Command, crate_version, init_cli};
 use axum::{
-    BoxError, Json, RequestPartsExt, Router,
-    extract::{FromRequest, Request, State, rejection::JsonRejection},
+    BoxError, Router,
     handler::HandlerWithoutStateExt,
     http::{StatusCode, Uri, uri::Authority},
     response::Redirect,
     routing::post,
 };
-use axum_extra::extract::Host;
+use axum_extra::
+    extract::Host
+;
 use axum_server::tls_rustls::RustlsConfig;
-use cache::Cache;
+use serde::{Deserialize, Serialize};
 
 use crate::cache::{CacheKey, load_cache};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use anyhow::Result;
 use std::{collections::HashMap, future::Future, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::signal;
 
@@ -97,12 +98,26 @@ async fn main() {
     //save the future for easy shutting down of redirect server
     let shutdown_future = shutdown_signal(handle.clone());
 
-    let app = Router::new().route("/write", post(handler)).with_state((
-        chip_cache,
-        config.sensor_data_dir,
-        config.measure_name_to_field,
-        config.influxdb,
-    ));
+    let sensor_data_dir = PathBuf::from(
+        shellexpand::env(&config.sensor_data_dir.as_os_str().to_string_lossy())
+            .unwrap()
+            .as_ref(),
+    );
+
+    let mut logins: HashMap<String, String> = HashMap::new();
+    for login in config.logins {
+        logins.insert(login.username.to_lowercase(), login.password);
+    }
+
+    let app = Router::new()
+        .route("/write", post(http::handler))
+        .with_state(http::ReqState {
+            chip_info_cache: chip_cache,
+            sensor_data_dir,
+            measure_name_to_field: config.measure_name_to_field,
+            influxdb_settings: config.influxdb,
+            logins,
+        });
     //.layer(middleware::from_fn(print_request_body));
 
     let https_addr = config.https_addr.trim();
@@ -191,31 +206,43 @@ async fn shutdown_signal(handle: axum_server::Handle) {
 
 // {"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}
 
+/*
+#[derive(Clone)]
+struct ReqState {
+    chip_info_cache: Cache<ChipInfo>,
+    sensor_data_dir: PathBuf,
+    measure_name_to_field: HashMap<String, String>,
+    influxdb_settings: config::InfluxDB,
+    logins: HashMap<String, String>,
+}
+
 async fn handler(
-    State((chip_info_cache, sensor_data_dir, measure_name_to_field, influxdb_settings)): State<(
-        Cache<ChipInfo>,
-        PathBuf,
-        HashMap<String, String>,
-        config::InfluxDB,
-    )>,
+    State(ReqState {
+        chip_info_cache,
+        sensor_data_dir,
+        measure_name_to_field,
+        influxdb_settings,
+        logins: _,
+    }): State<ReqState>,
 
     SensorData { json, sensor }: SensorData<sensor_data::Payload>,
-) {
+) -> Result<(), AppError> {
     // tracing::debug!(?sensor, "sensor");
     // tracing::debug!(?json, "json body");
     // println!("sensor: {}, json: {:?}", sensor, json);
 
     let formatted_day = format!("{}", chrono::Utc::now().format("%Y-%m-%d"));
+
     let root_folder = sensor_data_dir.join(&formatted_day);
     let file_name = format!("{}_chip_{}.csv", &formatted_day, &sensor);
 
     if let Err(e) = std::fs::create_dir_all(&root_folder) {
         tracing::error!(
             "Error creating sensor data folder at: {}, {}",
-            sensor_data_dir.as_os_str().to_string_lossy(),
+            root_folder.as_os_str().to_string_lossy(),
             e
         );
-        return;
+        return Err(AppError(anyhow!("{}", e)));
     }
 
     let file_path = root_folder.join(file_name);
@@ -232,13 +259,11 @@ async fn handler(
     {
         Ok(_) => {}
         Err(e) => {
-            tracing::error!(
-                "Error trying to write data for sensor {}: {}",
-                &sensor,
-                e
-            );
+            tracing::error!("Error trying to write data for sensor {}: {}", &sensor, e);
         }
     };
+
+    Ok(())
 
     /*
     wtr.write_record(&[
@@ -264,12 +289,15 @@ async fn handler(
 
 const X_SENSOR_HEADER: &str = "x-sensor";
 
+// the state your library needs
+
 impl<S, T> FromRequest<S> for SensorData<T>
 where
     S: Send + Sync,
     Json<T>: FromRequest<()>,
     axum::Json<T>: FromRequest<S, Rejection = JsonRejection>,
     T: 'static,
+    ReqState: FromRef<S>,
 {
     type Rejection = (StatusCode, axum::Json<serde_json::Value>);
 
@@ -280,17 +308,41 @@ where
         let sensor_header = req.headers().get(X_SENSOR_HEADER);
         let sensor = sensor_header.and_then(|value| value.to_str().ok());
         let sensor = sensor.unwrap_or_default().to_owned();
-        /*
-        let Json(json) = req.extract().await.map_err(|err| {
-            let resp = IntoResponse::into_response(err);
-            println!("{:?}", resp);
-            resp
-        })?;
-        */
 
         let (mut parts, body) = req.into_parts();
 
-        tracing::debug!(headers = ?parts.headers);
+        let creds = match parts.extract::<TypedHeader<Authorization<Basic>>>().await {
+            Ok(TypedHeader(Authorization(bearer))) => bearer,
+            Err(_) => {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": "missing credentials",
+                    })),
+                ));
+            }
+        };
+
+        let mystate: ReqState = ReqState::from_ref(state);
+
+        let pwd = mystate
+            .logins
+            .get(&creds.username().to_lowercase())
+            .ok_or((
+                StatusCode::UNAUTHORIZED,
+                Json(json!({
+                    "error": "wrong credentials",
+                })),
+            ))?;
+
+        if pwd != creds.password() {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Unauthorized"})),
+            ));
+        };
+
+        // tracing::debug!(headers = ?parts.headers);
         // tracing::debug!(body = ?body);
 
         // We can use other extractors to provide better rejection messages.
@@ -326,6 +378,8 @@ where
         Ok(data)
     }
 }
+*/
+
 
 async fn redirect_http_to_https<F>(addrs: Addresses, signal: F)
 where
