@@ -1,6 +1,6 @@
-mod http;
 mod cache;
 mod config;
+mod http;
 mod logging;
 mod sensor_data;
 
@@ -12,9 +12,7 @@ use axum::{
     response::Redirect,
     routing::post,
 };
-use axum_extra::
-    extract::Host
-;
+use axum_extra::extract::Host;
 use axum_server::tls_rustls::RustlsConfig;
 use serde::{Deserialize, Serialize};
 
@@ -81,15 +79,19 @@ async fn main() {
 
     tracing::debug!("working directory: {}", ctx.working_dir.display());
 
+    let chips_filepath = shellexpand::env(&config.chips_filepath.as_os_str().to_string_lossy())
+        .unwrap()
+        .as_ref()
+        .to_owned();
+
     // load chip cache with hot reload
-    let (chip_cache, _watcher) =
-        match load_cache::<ChipInfo>(&config.chips_filepath.as_os_str().to_string_lossy()) {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::error!("could not load the chip info cache: {}", e);
-                return;
-            }
-        };
+    let (chip_cache, _watcher) = match load_cache::<ChipInfo>(&chips_filepath) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("could not load the chip info cache: {}", e);
+            return;
+        }
+    };
 
     let http_addr: SocketAddr = config.http_addr.trim().parse().unwrap();
 
@@ -379,7 +381,6 @@ where
     }
 }
 */
-
 
 async fn redirect_http_to_https<F>(addrs: Addresses, signal: F)
 where
