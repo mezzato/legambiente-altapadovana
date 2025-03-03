@@ -1,23 +1,24 @@
-use crate::{config::{self}, sensor_data, ChipInfo, SensorData};
+use crate::{
+    ChipInfo, SensorData,
+    config::{self},
+    sensor_data,
+};
 use axum::{
-    Json, RequestPartsExt, extract::{FromRef, FromRequest, Request, State, rejection::JsonRejection},
+    Json, RequestPartsExt,
+    extract::{FromRef, FromRequest, Request, State, rejection::JsonRejection},
     http::StatusCode,
     response::IntoResponse,
 };
 use axum_extra::{
     TypedHeader,
-    headers::{
-        Authorization,
-        authorization::Basic,
-    },
+    headers::{Authorization, Origin, authorization::Basic},
 };
+use tracing::{Level, enabled};
 
 use crate::cache::Cache;
 use anyhow::{Result, anyhow};
 use serde_json::json;
 use std::{collections::HashMap, path::PathBuf};
-
-
 
 // Use anyhow, define error and enable '?'
 // For a simplified example of using anyhow in axum check /examples/anyhow-error-response
@@ -43,7 +44,6 @@ where
         Self(err.into())
     }
 }
-
 
 #[derive(Clone)]
 pub struct ReqState {
@@ -140,8 +140,6 @@ where
     type Rejection = (StatusCode, axum::Json<serde_json::Value>);
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        // tracing::debug!(request = ?req);
-
         // Extract the token from the authorization header
         let sensor_header = req.headers().get(X_SENSOR_HEADER);
         let sensor = sensor_header.and_then(|value| value.to_str().ok());
@@ -149,9 +147,24 @@ where
 
         let (mut parts, body) = req.into_parts();
 
+        let origin = parts
+            .headers
+            .get("Origin")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+
+        if enabled!(Level::DEBUG) {
+            tracing::debug!("request received from origin: {}", origin);
+        }
+
         let creds = match parts.extract::<TypedHeader<Authorization<Basic>>>().await {
             Ok(TypedHeader(Authorization(bearer))) => bearer,
             Err(_) => {
+                if enabled!(Level::DEBUG) {
+                    tracing::debug!("missing credentials for origin: {}", origin);
+                }
+
                 return Err((
                     StatusCode::BAD_REQUEST,
                     Json(json!({
@@ -166,12 +179,21 @@ where
         let pwd = mystate
             .logins
             .get(&creds.username().to_lowercase())
-            .ok_or((
-                StatusCode::UNAUTHORIZED,
-                Json(json!({
-                    "error": "wrong credentials",
-                })),
-            ))?;
+            .ok_or_else(|| {
+                if enabled!(Level::DEBUG) {
+                    tracing::debug!(
+                        "wrong credentials for username {}, origin: {}",
+                        &creds.username(),
+                        origin
+                    );
+                }
+                (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({
+                        "error": "wrong credentials",
+                    })),
+                )
+            })?;
 
         if pwd != creds.password() {
             return Err((
