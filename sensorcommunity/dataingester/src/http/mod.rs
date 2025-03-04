@@ -1,5 +1,5 @@
 use crate::{
-    ChipInfo, SensorData,
+    ChipInfo, SensorData, SensorInfo,
     config::{self},
     sensor_data,
 };
@@ -11,7 +11,7 @@ use axum::{
 };
 use axum_extra::{
     TypedHeader,
-    headers::{Authorization, Origin, authorization::Basic},
+    headers::{Authorization, authorization::Basic},
 };
 use tracing::{Level, enabled};
 
@@ -47,18 +47,22 @@ where
 
 #[derive(Clone)]
 pub struct ReqState {
-    pub chip_info_cache: Cache<ChipInfo>,
+    pub chip_cache: Cache<ChipInfo>,
+    pub sensor_cache: Cache<SensorInfo>,
     pub sensor_data_dir: PathBuf,
     pub measure_name_to_field: HashMap<String, String>,
+    pub measure_name_to_sensor_type: HashMap<String, String>,
     pub influxdb_settings: config::InfluxDB,
     pub logins: HashMap<String, String>,
 }
 
 pub async fn handler(
     State(ReqState {
-        chip_info_cache,
+        chip_cache,
+        sensor_cache,
         sensor_data_dir,
         measure_name_to_field,
+        measure_name_to_sensor_type,
         influxdb_settings,
         logins: _,
     }): State<ReqState>,
@@ -89,7 +93,9 @@ pub async fn handler(
         &influxdb_settings,
         &file_path,
         &measure_name_to_field,
-        chip_info_cache,
+        &measure_name_to_sensor_type,
+        chip_cache,
+        sensor_cache,
         &sensor,
         json,
     )

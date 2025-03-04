@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use notify::{Error, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ pub trait CacheKey {
 /// The key is the chip id
 // type ChipCache = HashMap<String, ChipInfo>;
 
-pub type Cache<T> = Arc<Mutex<HashMap<String, T>>>;
+pub type Cache<T> = Arc<RwLock<HashMap<String, T>>>;
 
 fn load_cache_from_file<T: CacheKey + serde::de::DeserializeOwned>(
     path: &str,
@@ -47,7 +47,7 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
     // to guarantee that the config won't be read and written to at the same time.
     // To learn about how that works,
     // please check out the [Fearless Concurrency](https://doc.rust-lang.org/book/ch16-00-concurrency.html) chapter of the Rust book.
-    let config = Arc::new(Mutex::new(config));
+    let config = Arc::new(RwLock::new(config));
     let cloned_config = Arc::clone(&config);
 
     let cloned_path = path.to_owned();
@@ -67,7 +67,7 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
                 match load_cache_from_file(&cloned_path) {
                     Ok(new_config) => {
                         tracing::info!("Successfully reloaded cache from file: {}", &cloned_path);
-                        *cloned_config.lock().unwrap() = new_config
+                        *cloned_config.try_write().unwrap() = new_config
                     },
                     Err(error) => {
                         tracing::error!("Error reloading cache from file {}: {:?}", &cloned_path,error)

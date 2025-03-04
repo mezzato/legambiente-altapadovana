@@ -40,6 +40,8 @@ pub struct Manifest {
     #[serde(default)]
     pub chips_filepath: PathBuf,
     #[serde(default)]
+    pub sensors_filepath: PathBuf,
+    #[serde(default)]
     pub sensor_data_dir: PathBuf,
     pub perf: PerfConfig,
     pub logging: Logging,
@@ -50,6 +52,7 @@ pub struct Manifest {
     pub influxdb: InfluxDB,
     pub logins: Vec<Login>,
     pub measure_name_to_field: HashMap<String, String>,
+    pub measure_name_to_sensor_type: HashMap<String, String>,
 }
 
 impl Manifest {
@@ -61,9 +64,10 @@ impl Manifest {
         manifest.path = PathBuf::from(path);
         manifest.tls_dir = PathBuf::from("tls");
         manifest.chips_filepath = PathBuf::from("chips.csv");
+        manifest.sensors_filepath = PathBuf::from("sensors.csv");
         manifest.sensor_data_dir = PathBuf::from("./chip_data");
         // manifest.sensors_filepath = PathBuf::from("sensors.csv");
-        
+
         manifest.http_addr = DEFAULT_HTTP_ADDR.to_string();
         manifest.https_addr = DEFAULT_HTTPS_ADDR.to_string();
 
@@ -104,6 +108,17 @@ impl Manifest {
         hash.insert("BME280_temperature".to_owned(), "temperature".to_owned());
         hash.insert("BME280_humidity".to_owned(), "humidity".to_owned());
         hash.insert("BME280_pressure".to_owned(), "pressure".to_owned());
+
+        let hash = &mut manifest.measure_name_to_sensor_type;
+        hash.insert("SDS_P1".to_owned(), "SDS011".to_owned());
+        hash.insert("SDS_P2".to_owned(), "SDS011".to_owned());
+        hash.insert("temperature".to_owned(), "DHT22".to_owned());
+        hash.insert("humidity".to_owned(), "DHT22".to_owned());
+        hash.insert("BMP_temperature".to_owned(), "BMP180".to_owned());
+        hash.insert("BMP_pressure".to_owned(), "BMP180".to_owned());
+        hash.insert("BME280_temperature".to_owned(), "BME280".to_owned());
+        hash.insert("BME280_humidity".to_owned(), "BME280".to_owned());
+        hash.insert("BME280_pressure".to_owned(), "BME280".to_owned());
 
         let guard = manifest.logging.setup()?;
         Ok((manifest, guard))

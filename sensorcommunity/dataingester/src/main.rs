@@ -32,9 +32,23 @@ pub struct ChipInfo {
     pub lon: f64,
 }
 
+// chip_id,sensor_id,sensor_type
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SensorInfo {
+    pub chip_id: String,
+    pub sensor_id: String,
+    pub sensor_type: String,
+}
+
 impl CacheKey for ChipInfo {
     fn id(&self) -> String {
         self.chip_id.clone()
+    }
+}
+
+impl CacheKey for SensorInfo {
+    fn id(&self) -> String {
+        format!("{}:{}", self.chip_id, self.sensor_type)
     }
 }
 
@@ -93,6 +107,20 @@ async fn main() {
         }
     };
 
+    let sensors_filepath = shellexpand::env(&config.sensors_filepath.as_os_str().to_string_lossy())
+        .unwrap()
+        .as_ref()
+        .to_owned();
+
+    // load chip cache with hot reload
+    let (sensor_cache, _watcher) = match load_cache::<SensorInfo>(&sensors_filepath) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("could not load the chip info cache: {}", e);
+            return;
+        }
+    };
+
     let http_addr: SocketAddr = config.http_addr.trim().parse().unwrap();
 
     //Create a handle for our TLS server so the shutdown signal can all shutdown
@@ -114,9 +142,11 @@ async fn main() {
     let app = Router::new()
         .route("/write", post(http::handler))
         .with_state(http::ReqState {
-            chip_info_cache: chip_cache,
+            chip_cache: chip_cache,
+            sensor_cache: sensor_cache,
             sensor_data_dir,
             measure_name_to_field: config.measure_name_to_field,
+            measure_name_to_sensor_type: config.measure_name_to_sensor_type,
             influxdb_settings: config.influxdb,
             logins,
         });

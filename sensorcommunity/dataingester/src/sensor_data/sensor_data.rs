@@ -1,14 +1,16 @@
 use std::{collections::HashMap, fs::OpenOptions, io::Seek};
 
+use crate::cache::Cache;
+use anyhow::{Result, anyhow};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-
-use crate::cache::Cache;
 
 // "Time", durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
 // chip_id;lat;lon;timestamp;P1;durP1;ratioP1;P2;durP2;ratioP2;temperature;humidity;pressure;signal
 
 const CHIP_ID: &str = "chip_id";
+const SENSOR_ID: &str = "sensor_id";
+const SENSOR_TYPE: &str = "sensor_type";
 const LAT: &str = "lat";
 const LON: &str = "lon";
 const CITY: &str = "city";
@@ -28,6 +30,8 @@ const SIGNAL: &str = "signal";
 #[derive(Debug, Serialize, Default)]
 pub struct DataRecord<'a> {
     chip_id: &'a str,
+    sensor_id: &'a str,
+    sensor_type: &'a str,
     lat: f64,
     lon: f64,
     timestamp: i64,
@@ -76,11 +80,29 @@ pub struct SensorValue {
     value: String,
 }
 
+pub fn get_sensor_id(
+    sensor_cache: &Cache<crate::SensorInfo>,
+    cache_id: &str,
+) -> Result<String, anyhow::Error> {
+    match sensor_cache.read() {
+        Ok(cache) => {
+            if let Some(info) = cache.get(cache_id) {
+                Ok(info.sensor_id.to_owned())
+            } else {
+                Err(anyhow!("missing sensory id for key: {}", cache_id))
+            }
+        }
+        Err(e) => Err(anyhow!("{}", e)),
+    }
+}
+
 pub async fn write(
     influxdb_settings: &crate::config::InfluxDB,
     file_path: &std::path::PathBuf,
     measure_name_to_field: &HashMap<String, String>,
-    cache: Cache<crate::ChipInfo>,
+    measure_name_to_sensor_type: &HashMap<String, String>,
+    chip_cache: Cache<crate::ChipInfo>,
+    sensor_cache: Cache<crate::SensorInfo>,
     chip_id: &str,
     payload: Payload,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -90,17 +112,28 @@ pub async fn write(
 
     let mut d = DataRecord::default();
 
-    if let Some(info) = cache.lock().unwrap().get(chip_id) {
-        d.city = info.city.to_owned();
-        d.description = info.description.to_owned();
-        d.lat = info.lat;
-        d.lon = info.lon;
-    } else {
-        tracing::error!(
-            "skipping missing chip id: {}. If you want to record its data add it to the chip file.",
-            chip_id,
-        );
-        return Ok(());
+    match chip_cache.read() {
+        Ok(cache) => {
+            if let Some(info) = cache.get(chip_id) {
+                d.city = info.city.to_owned();
+                d.description = info.description.to_owned();
+                d.lat = info.lat;
+                d.lon = info.lon;
+            } else {
+                tracing::error!(
+                    "skipping missing chip id: {}. If you want to record its data add it to the chip file.",
+                    chip_id,
+                );
+                return Ok(());
+            }
+        }
+        _ => {
+            tracing::error!(
+                "skipping chip id: {}. Error trying to acquire cache lock.",
+                chip_id,
+            );
+            return Ok(());
+        }
     }
 
     d.timestamp = timestamp;
@@ -113,13 +146,41 @@ pub async fn write(
             .get(&data_row.value_type)
             .unwrap_or_else(|| &data_row.value_type);
 
+        let sensor_type = match measure_name_to_sensor_type.get(&data_row.value_type) {
+            Some(s) => s,
+            None => {
+                tracing::error!(
+                    "Missing sensor type of chip id {} with value type {}",
+                    chip_id,
+                    &data_row.value_type,
+                );
+                continue;
+            }
+        };
+
+        let sensor_id = match get_sensor_id(&sensor_cache, &format!("{}:{}", chip_id, &sensor_type))
+        {
+            Ok(id) => id,
+            Err(e) => {
+                tracing::error!(
+                    "Error trying to get the sensor id for chip id {} and sensor type {}: {}",
+                    chip_id,
+                    &sensor_type,
+                    e,
+                );
+                continue;
+            }
+        };
+
         let mut dp = influxdb2::models::DataPoint::builder(&influxdb_settings.measurement);
 
         dp = dp
             .tag(CHIP_ID, chip_id)
             .tag(CITY, d.city.clone())
             .tag(LAT, format!("{:.6}", d.lat))
-            .tag(LON, format!("{:.6}", d.lon));
+            .tag(LON, format!("{:.6}", d.lon))
+            .tag(SENSOR_ID, sensor_id)
+            .tag(SENSOR_TYPE, sensor_type);
 
         dp = match field_name.as_str() {
             P1 => {
