@@ -22,7 +22,7 @@ const P2: &str = "P2";
 const DUR_P2: &str = "durP2";
 const RATIO_P2: &str = "ratioP2";
 const TEMPERATURE: &str = "temperature";
-const HUMIDITY: &str = "humidy";
+const HUMIDITY: &str = "humidity";
 const PRESSURE: &str = "pressure";
 const SIGNAL: &str = "signal";
 
@@ -149,8 +149,8 @@ pub async fn write(
         let sensor_type = match measure_name_to_sensor_type.get(&data_row.value_type) {
             Some(s) => s,
             None => {
-                tracing::error!(
-                    "Missing sensor type of chip id {} with value type {}",
+                tracing::debug!(
+                    "Missing sensor type for chip id {} with value type {}, skipping value",
                     chip_id,
                     &data_row.value_type,
                 );
