@@ -182,6 +182,12 @@ pub async fn write(
             .tag(SENSOR_ID, sensor_id)
             .tag(SENSOR_TYPE, sensor_type);
 
+        let v = data_row.value.parse::<f64>();
+        d.p1 = v.clone().ok();
+        dp = dp.field(field_name.as_str(), v.unwrap_or_default() as f64);
+        points.push(dp.build()?);
+
+        /*
         dp = match field_name.as_str() {
             P1 => {
                 let v = data_row.value.parse::<f64>();
@@ -237,7 +243,7 @@ pub async fn write(
                 continue;
             }
         };
-        points.push(dp.build()?);
+        */
     }
 
     if let Err(e) = write_csv(file_path, &d) {
