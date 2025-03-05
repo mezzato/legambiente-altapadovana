@@ -14,6 +14,8 @@ const SENSOR_TYPE: &str = "sensor_type";
 const LAT: &str = "lat";
 const LON: &str = "lon";
 const CITY: &str = "city";
+
+/*
 //const TIMESTAMP: &str = "timestamp";
 const P1: &str = "P1";
 const DUR_P1: &str = "durP1";
@@ -25,6 +27,7 @@ const TEMPERATURE: &str = "temperature";
 const HUMIDITY: &str = "humidity";
 const PRESSURE: &str = "pressure";
 const SIGNAL: &str = "signal";
+*/
 
 // Note that structs can derive both Serialize and Deserialize!
 #[derive(Debug, Serialize, Default)]
