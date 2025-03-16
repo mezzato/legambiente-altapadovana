@@ -202,7 +202,7 @@ def main():
                     if len(row) == 0:
                         continue
 
-                    point = Point("particulate")
+                    point = Point("particolato")
                     
                     # sensor_id;sensor_type;location;lat;lon;timestamp;P1;durP1;ratioP1;P2;durP2;ratioP2
                     # 88089;SDS011;81096;45.566;11.932;2025-03-13T00:00:51;4.03;;;1.63;;
@@ -213,8 +213,10 @@ def main():
                     point.tag("sensor_id", sensor['sensor_id'])
                     point.tag("sensor_type", sensor['sensor_type'])
                     point.tag("location", row[2])
-                    point.tag("lat", row[3])
-                    point.tag("lon", row[4])
+                    val = safe_float_convert(row[3])
+                    point.tag("lat", val)
+                    val = safe_float_convert(row[4])
+                    point.tag("lon", val)
                     point.time(parser.parse(row[5]))
 
                     for i in range(6, len(headers)):

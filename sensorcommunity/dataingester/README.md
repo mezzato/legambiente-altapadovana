@@ -28,3 +28,10 @@
   # At every 5th minute
   */5 * * * * /usr/bin/env bash -c 'cd /root/workspace/legambiente-altapadovana/sensorcommunity/influxdb/ && source .venv/bin/activate && ./import_data_last_5_min.py' > /dev/null 2>&1
   ```
+
+
+  ## How to delete a measure
+
+```bash
+influx delete --bucket sensorcommunity --predicate '_measurement="particulate"' --start '2025-03-12T00:00:00Z' --stop '2025-03-16T23:00:00Z'  --skip-verify
+```

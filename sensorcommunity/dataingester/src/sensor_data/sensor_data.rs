@@ -180,8 +180,8 @@ pub async fn write(
         dp = dp
             .tag(CHIP_ID, chip_id)
             .tag(CITY, d.city.clone())
-            .tag(LAT, format!("{:.6}", d.lat))
-            .tag(LON, format!("{:.6}", d.lon))
+            .tag(LAT, d.lat)
+            .tag(LON, d.lon)
             .tag(SENSOR_ID, sensor_id)
             .tag(SENSOR_TYPE, sensor_type);
 

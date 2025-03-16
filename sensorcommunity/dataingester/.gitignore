@@ -3,3 +3,6 @@ dataingester.toml
 ./chip_data
 config.json
 .venv
+bin
+.vscode
+__pycache__

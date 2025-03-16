@@ -151,7 +151,7 @@ else:
 
                 # Iterate through the JSON array 
                 for item in data:
-                    point = Point("particulate")
+                    point = Point("particolato")
                     for sensorvalue in item["sensordatavalues"]:
                         point.field(sensorvalue["value_type"], float(sensorvalue["value"]))
                     
