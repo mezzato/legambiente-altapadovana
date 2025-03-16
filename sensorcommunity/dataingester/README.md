@@ -1,9 +1,30 @@
 
-2025-02-18T11:00:55.801992Z DEBUG body=b"{\"esp8266id\": \"15303512\", \"software_version\": \"NRZ-2024-135\", \"sensordatavalues\":[{\"value_type\":\"SDS_P1\",\"value\":\"27.60\"},{\"value_type\":\"SDS_P2\",\"value\":\"14.65\"},{\"value_type\":\"temperature\",\"value\":\"6.60\"},{\"value_type\":\"humidity\",\"value\":\"32.90\"},{\"value_type\":\"samples\",\"value\":\"5311057\"},{\"value_type\":\"min_micro\",\"value\":\"26\"},{\"value_type\":\"max_micro\",\"value\":\"363441\"},{\"value_type\":\"interval\",\"value\":\"145000\"},{\"value_type\":\"signal\",\"value\":\"-70\"}]}"
-2025-02-18T11:00:55.802152Z DEBUG headers={"host": "static.125.41.201.195.clients.your-server.de:7878", "user-agent": "NRZ-2024-135/15303512/3c6105e98358", "accept-encoding": "identity;q=1,chunked;q=0.1,*;q=0", "connection": "close", "content-type": "application/json", "x-sensor": "esp8266-15303512", "x-mac-id": "esp8266-3c6105e98358", "content-length": "457"}
-2025-02-18T11:00:55.802412Z DEBUG request{method=POST uri=/digest version=HTTP/1.1}: started processing request
-2025-02-18T11:00:55.802490Z DEBUG request{method=POST uri=/digest version=HTTP/1.1}: handler received body body=b"{\"esp8266id\": \"15303512\", \"software_version\": \"NRZ-2024-135\", \"sensordatavalues\":[{\"value_type\":\"SDS_P1\",\"value\":\"27.60\"},{\"value_type\":\"SDS_P2\",\"value\":\"14.65\"},{\"value_type\":\"temperature\",\"value\":\"6.60\"},{\"value_type\":\"humidity\",\"value\":\"32.90\"},{\"value_type\":\"samples\",\"value\":\"5311057\"},{\"value_type\":\"min_micro\",\"value\":\"26\"},{\"value_type\":\"max_micro\",\"value\":\"363441\"},{\"value_type\":\"interval\",\"value\":\"145000\"},{\"value_type\":\"signal\",\"value\":\"-70\"}]}"
-2025-02-18T11:00:55.802524Z DEBUG request{method=POST uri=/digest version=HTTP/1.1}: finished processing request latency=0 ms status=200
+## How to install and run the python script
 
+- Install the python 3 virtual environment:
 
-{"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}
+  ```
+  sudo apt install python3-pip
+
+  # use python3 --version to determine the specific version
+  sudo apt install python3.12-venv
+  
+  python3 -m venv .venv
+  .venv/bin/pip install influxdb-client python-dateutil requests
+  ```
+
+- Generate the config.json file. 
+  Use `influx config --json` to get the settings. Rember to use `"verify_ssl": false` for self-signed certificates.
+
+- Set up the cron job:
+
+  ```bash
+  crontab -e
+  ```
+
+  Add
+
+  ```
+  # At every 5th minute
+  */5 * * * * /usr/bin/env bash -c 'cd /root/workspace/legambiente-altapadovana/sensorcommunity/influxdb/ && source .venv/bin/activate && ./import_data_last_5_min.py' > /dev/null 2>&1
+  ```

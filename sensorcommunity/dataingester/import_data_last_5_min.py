@@ -65,6 +65,8 @@ else:
             line_count += 1
             if line_count == 0:
                 continue
+            if len(row) == 0:
+                continue
             chip_id=row[0]
             lat=row[1]
             lon=row[2]
@@ -88,6 +90,8 @@ else:
         for row in csv_reader:
             line_count += 1
             if line_count == 0:
+                continue
+            if len(row) == 0:
                 continue
             chip_id=row[0]
             sensor_id=row[1]
@@ -172,11 +176,14 @@ else:
             # remove the file
             os.remove(filename)
 
-        with InfluxDBClient.from_config_file(conn_file) as client:
-            with client.write_api(write_options=SYNCHRONOUS) as writer:
-                try:
-                    writer.write(bucket="sensorcommunity", record=points)
-                except InfluxDBError as e:
-                    print(f'InfluxDB error: {e}')
+        if len(points) > 0:
+            with InfluxDBClient.from_config_file(conn_file) as client:
+                with client.write_api(write_options=SYNCHRONOUS) as writer:
+                    try:
+                        writer.write(bucket="sensorcommunity", record=points)
+                    except InfluxDBError as e:
+                        print(f'InfluxDB error: {e}')
+        else:
+            print(f'No data to import into InfluxDB')
 
 mpath.rmdir()
