@@ -40,11 +40,14 @@ CONFFILE="dataingester.toml"
 CONF="$CONFDIR/$CONFFILE"
 SERVICENAME=dataingesterd
 LOGDIR="/var/log/dataingester"
+USER=dataingester
 
 echo stop the service
 serviceCommand $SERVICENAME stop
 
-# mkdir -p $LOGDIR
+sudo mkdir -p $LOGDIR
+sudo chown $USER:$USER -R $LOGDIR
+sudo chmod 755 $LOGDIR
 
 if [ -f $EXEC ]; then
   echo move old binary to $EXEC.old

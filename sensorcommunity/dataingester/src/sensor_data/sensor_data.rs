@@ -41,8 +41,6 @@ const SIGNAL: &str = "signal";
 #[derive(Debug, Serialize, Default)]
 pub struct DataRecord<'a> {
     chip_id: &'a str,
-    sensor_id: &'a str,
-    sensor_type: &'a str,
     lat: f64,
     lon: f64,
     timestamp: i64,

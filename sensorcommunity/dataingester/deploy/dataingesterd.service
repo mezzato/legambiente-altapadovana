@@ -5,7 +5,7 @@ Description=dataingester daemon program
 Type=simple
 ExecStart=/usr/local/bin/dataingester \
 	-c /etc/dataingester/dataingester.toml
-User=root
+User=dataingester
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
