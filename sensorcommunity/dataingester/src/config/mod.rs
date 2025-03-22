@@ -1,7 +1,7 @@
+mod hostname;
 mod init;
 mod manifest;
-mod hostname;
 
+pub use clap::{Arg, Command, crate_version};
 pub use init::*;
-pub use clap::{crate_version, Command, Arg};
-pub use manifest::InfluxDB;
+pub use manifest::{InfluxDB, InfluxDB3};

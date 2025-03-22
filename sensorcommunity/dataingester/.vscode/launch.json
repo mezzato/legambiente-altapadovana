@@ -5,7 +5,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${fileDirname}/../target/debug/dataingester",
+            "program": "${workspaceRoot}/target/debug/dataingester",
             "args": [],
             "cwd": "${workspaceRoot}",
             "sourceLanguages": [

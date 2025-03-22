@@ -525,6 +525,7 @@ dependencies = [
  "flate2",
  "futures",
  "http-body-util",
+ "influxdb",
  "influxdb2",
  "notify",
  "quickcheck",
@@ -1245,6 +1246,23 @@ checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "influxdb"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "601aa12a5876c044ea2a94a9443d0f086e6fc1f7bb4264bd7120e63c1462d1c8"
+dependencies = [
+ "chrono",
+ "futures-util",
+ "http 0.2.12",
+ "lazy_static",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

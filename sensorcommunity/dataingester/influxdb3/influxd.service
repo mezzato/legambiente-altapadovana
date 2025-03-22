@@ -1,0 +1,18 @@
+[Unit]
+Description=InfluxDB is an open-source, distributed, time series database
+Documentation=https://docs.influxdata.com/influxdb/
+After=network-online.target
+
+[Service]
+User=influxdb
+Group=influxdb
+LimitNOFILE=65536
+EnvironmentFile=-/etc/default/influxdb3
+KillMode=control-group
+ExecStart=/home/influxdb/.influxdb/influxdb3 serve --http-bind 0.0.0.0:8181 --object-store file --data-dir /home/influxdb/.influxdb/data --node-id host01 --log-filter info --max-http-request-size 20971520
+Type=simple
+TimeoutStartSec=10
+
+[Install]
+WantedBy=multi-user.target
+Alias=influxd.service

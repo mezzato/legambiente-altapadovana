@@ -27,7 +27,7 @@ pub const MANIFEST_NAME: &str = "dataingester.toml";
 pub struct ChipInfo {
     pub chip_id: String,
     pub city: String,
-    pub description: String,
+    pub info: String,
     pub lat: f64,
     pub lon: f64,
 }
@@ -148,6 +148,7 @@ async fn main() {
             measure_name_to_field: config.measure_name_to_field,
             measure_name_to_sensor_type: config.measure_name_to_sensor_type,
             influxdb_settings: config.influxdb,
+            influxdb3_settings: config.influxdb3,
             logins,
         });
     //.layer(middleware::from_fn(print_request_body));

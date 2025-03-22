@@ -53,6 +53,7 @@ pub struct ReqState {
     pub measure_name_to_field: HashMap<String, String>,
     pub measure_name_to_sensor_type: HashMap<String, String>,
     pub influxdb_settings: config::InfluxDB,
+    pub influxdb3_settings: config::InfluxDB3,
     pub logins: HashMap<String, String>,
 }
 
@@ -64,6 +65,7 @@ pub async fn handler(
         measure_name_to_field,
         measure_name_to_sensor_type,
         influxdb_settings,
+        influxdb3_settings,
         logins: _,
     }): State<ReqState>,
 
@@ -91,6 +93,7 @@ pub async fn handler(
 
     match sensor_data::write(
         &influxdb_settings,
+        &influxdb3_settings,
         &file_path,
         &measure_name_to_field,
         &measure_name_to_sensor_type,

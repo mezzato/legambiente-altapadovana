@@ -50,6 +50,7 @@ pub struct Manifest {
     #[serde(default)]
     pub https_addr: String,
     pub influxdb: InfluxDB,
+    pub influxdb3: InfluxDB3,
     pub logins: Vec<Login>,
     pub measure_name_to_field: HashMap<String, String>,
     pub measure_name_to_sensor_type: HashMap<String, String>,
@@ -326,6 +327,29 @@ pub struct InfluxDB {
     pub bucket: String,
     #[serde(default)]
     pub measurement: String,
+}
+
+impl Default for InfluxDB3 {
+    fn default() -> Self {
+        InfluxDB3 {
+            url: "".to_owned(),
+            token: "".to_owned(),
+            database: "mydb".to_owned(),
+            table: "".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct InfluxDB3 {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub database: String,
+    #[serde(default)]
+    pub table: String,
 }
 
 #[cfg(test)]

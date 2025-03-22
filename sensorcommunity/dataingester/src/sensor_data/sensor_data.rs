@@ -3,6 +3,7 @@ use std::{collections::HashMap, fs::OpenOptions, io::Seek};
 use crate::cache::Cache;
 use anyhow::{Result, anyhow};
 use chrono::Utc;
+use influxdb::InfluxDbWriteable;
 use serde::{Deserialize, Serialize};
 
 // "Time", durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
@@ -14,20 +15,27 @@ const SENSOR_TYPE: &str = "sensor_type";
 const LAT: &str = "lat";
 const LON: &str = "lon";
 const CITY: &str = "city";
+const INFO: &str = "info";
 
-/*
 //const TIMESTAMP: &str = "timestamp";
 const P1: &str = "P1";
+const SDS_P1: &str = "SDS_P1";
 const DUR_P1: &str = "durP1";
 const RATIO_P1: &str = "ratioP1";
 const P2: &str = "P2";
+
+const SDS_P2: &str = "SDS_P2";
 const DUR_P2: &str = "durP2";
 const RATIO_P2: &str = "ratioP2";
 const TEMPERATURE: &str = "temperature";
+const BMP_TEMPERATURE: &str = "BMP_temperature";
+const BME280_TEMPERATURE: &str = "BMP280_temperature";
 const HUMIDITY: &str = "humidity";
-const PRESSURE: &str = "pressure";
+const BMP_PRESSURE: &str = "BMP_pressure";
+const BME280_HUMIDITY: &str = "BME280_humidity";
+const BME280_PRESSURE: &str = "BME280_pressure";
+
 const SIGNAL: &str = "signal";
-*/
 
 // Note that structs can derive both Serialize and Deserialize!
 #[derive(Debug, Serialize, Default)]
@@ -50,12 +58,25 @@ pub struct DataRecord<'a> {
     ratio_p2: Option<f64>,
     #[serde(rename = "durP2")]
     dur_p2: Option<i64>,
+    #[serde(rename = "SDS_P1")]
+    sds_p1: Option<f64>,
+    #[serde(rename = "SDS_P2")]
+    sds_p2: Option<f64>,
     temperature: Option<f64>,
     humidity: Option<f64>,
-    pressure: Option<f64>,
+    #[serde(rename = "BMP_temperature")]
+    bmp_temperature: Option<f64>,
+    #[serde(rename = "BMP_pressure")]
+    bmp_pressure: Option<f64>,
+    #[serde(rename = "BME280_temperature")]
+    bmp280_temperature: Option<f64>,
+    #[serde(rename = "BMP280_humidity")]
+    bmp280_humidity: Option<f64>,
+    #[serde(rename = "BMP280_pressure")]
+    bmp280_pressure: Option<f64>,
     signal: Option<i64>,
     city: String,
-    description: String,
+    info: String,
 }
 
 /*
@@ -101,6 +122,7 @@ pub fn get_sensor_id(
 
 pub async fn write(
     influxdb_settings: &crate::config::InfluxDB,
+    influxdb3_settings: &crate::config::InfluxDB3,
     file_path: &std::path::PathBuf,
     measure_name_to_field: &HashMap<String, String>,
     measure_name_to_sensor_type: &HashMap<String, String>,
@@ -119,7 +141,7 @@ pub async fn write(
         Ok(cache) => {
             if let Some(info) = cache.get(chip_id) {
                 d.city = info.city.to_owned();
-                d.description = info.description.to_owned();
+                d.info = info.info.to_owned();
                 d.lat = info.lat;
                 d.lon = info.lon;
             } else {
@@ -144,7 +166,96 @@ pub async fn write(
 
     let mut points = vec![];
 
+    let mut write_queries = Vec::<influxdb::WriteQuery>::new();
+
+    let use_influxdb_3 = influxdb_settings.url.len() == 0;
+
     for data_row in payload.sensordatavalues {
+        // write csv first
+        match data_row.value_type.as_str() {
+            P1 => {
+                let v = data_row.value.parse::<f64>();
+                d.p1 = v.clone().ok();
+                // dp.field(P1, v.unwrap_or_default() as f64)
+            }
+            SDS_P1 => {
+                let v = data_row.value.parse::<f64>();
+                d.sds_p1 = v.clone().ok();
+                // dp.field(P1, v.unwrap_or_default() as f64)
+            }
+            DUR_P1 => {
+                let v = data_row.value.parse::<i64>();
+                d.dur_p1 = v.clone().ok();
+                // dp.field(DUR_P1, v.unwrap_or_default() as i64)
+            }
+            RATIO_P1 => {
+                let v = data_row.value.parse::<f64>();
+                d.ratio_p1 = v.clone().ok();
+                // dp.field(RATIO_P1, v.unwrap_or_default() as f64)
+            }
+            P2 => {
+                let v = data_row.value.parse::<f64>();
+                d.p2 = v.clone().ok();
+                // dp.field(P2, v.unwrap_or_default() as f64)
+            }
+            SDS_P2 => {
+                let v = data_row.value.parse::<f64>();
+                d.sds_p2 = v.clone().ok();
+                // dp.field(P1, v.unwrap_or_default() as f64)
+            }
+            DUR_P2 => {
+                let v = data_row.value.parse::<i64>();
+                d.dur_p2 = v.clone().ok();
+                // dp.field(DUR_P2, v.unwrap_or_default() as i64)
+            }
+            RATIO_P2 => {
+                let v = data_row.value.parse::<f64>();
+                d.ratio_p2 = v.clone().ok();
+                // dp.field(RATIO_P2, v.unwrap_or_default() as f64)
+            }
+            TEMPERATURE => {
+                let v = data_row.value.parse::<f64>();
+                d.temperature = v.clone().ok();
+                // dp.field(TEMPERATURE, v.unwrap_or_default() as f64)
+            }
+            BMP_TEMPERATURE => {
+                let v = data_row.value.parse::<f64>();
+                d.bmp_temperature = v.clone().ok();
+                // dp.field(TEMPERATURE, v.unwrap_or_default() as f64)
+            }
+            BME280_TEMPERATURE => {
+                let v = data_row.value.parse::<f64>();
+                d.bmp280_temperature = v.clone().ok();
+                // dp.field(TEMPERATURE, v.unwrap_or_default() as f64)
+            }
+            HUMIDITY => {
+                let v = data_row.value.parse::<f64>();
+                d.humidity = v.clone().ok();
+                // dp.field(HUMIDITY, v.unwrap_or_default() as f64)
+            }
+            BME280_HUMIDITY => {
+                let v = data_row.value.parse::<f64>();
+                d.bmp280_humidity = v.clone().ok();
+                // dp.field(HUMIDITY, v.unwrap_or_default() as f64)
+            }
+            BMP_PRESSURE => {
+                let v = data_row.value.parse::<f64>();
+                d.bmp_pressure = v.clone().ok();
+                // dp.field(PRESSURE, v.unwrap_or_default() as f64)
+            }
+            BME280_PRESSURE => {
+                let v = data_row.value.parse::<f64>();
+                d.bmp280_pressure = v.clone().ok();
+                // dp.field(PRESSURE, v.unwrap_or_default() as f64)
+            }
+            SIGNAL => {
+                let v = data_row.value.parse::<i64>();
+                d.signal = v.clone().ok();
+                // dp.field(SIGNAL, v.unwrap_or_default() as i64)
+            }
+            _ => {}
+        };
+
         let field_name = measure_name_to_field
             .get(&data_row.value_type)
             .unwrap_or_else(|| &data_row.value_type);
@@ -175,78 +286,38 @@ pub async fn write(
             }
         };
 
-        let mut dp = influxdb2::models::DataPoint::builder(&influxdb_settings.measurement);
-
-        dp = dp
-            .tag(CHIP_ID, chip_id)
-            .tag(CITY, d.city.clone())
-            .tag(LAT, d.lat)
-            .tag(LON, d.lon)
-            .tag(SENSOR_ID, sensor_id)
-            .tag(SENSOR_TYPE, sensor_type);
-
         let v = data_row.value.parse::<f64>();
-        d.p1 = v.clone().ok();
-        dp = dp.field(field_name.as_str(), v.unwrap_or_default() as f64);
-        points.push(dp.build()?);
 
-        /*
-        dp = match field_name.as_str() {
-            P1 => {
-                let v = data_row.value.parse::<f64>();
-                d.p1 = v.clone().ok();
-                dp.field(P1, v.unwrap_or_default() as f64)
-            }
-            DUR_P1 => {
-                let v = data_row.value.parse::<i64>();
-                d.dur_p1 = v.clone().ok();
-                dp.field(DUR_P1, v.unwrap_or_default() as i64)
-            }
-            RATIO_P1 => {
-                let v = data_row.value.parse::<f64>();
-                d.ratio_p1 = v.clone().ok();
-                dp.field(RATIO_P1, v.unwrap_or_default() as f64)
-            }
-            P2 => {
-                let v = data_row.value.parse::<f64>();
-                d.p2 = v.clone().ok();
-                dp.field(P2, v.unwrap_or_default() as f64)
-            }
-            DUR_P2 => {
-                let v = data_row.value.parse::<i64>();
-                d.dur_p2 = v.clone().ok();
-                dp.field(DUR_P2, v.unwrap_or_default() as i64)
-            }
-            RATIO_P2 => {
-                let v = data_row.value.parse::<f64>();
-                d.ratio_p2 = v.clone().ok();
-                dp.field(RATIO_P2, v.unwrap_or_default() as f64)
-            }
-            TEMPERATURE => {
-                let v = data_row.value.parse::<f64>();
-                d.temperature = v.clone().ok();
-                dp.field(TEMPERATURE, v.unwrap_or_default() as f64)
-            }
-            HUMIDITY => {
-                let v = data_row.value.parse::<f64>();
-                d.humidity = v.clone().ok();
-                dp.field(HUMIDITY, v.unwrap_or_default() as f64)
-            }
-            PRESSURE => {
-                let v = data_row.value.parse::<f64>();
-                d.pressure = v.clone().ok();
-                dp.field(PRESSURE, v.unwrap_or_default() as f64)
-            }
-            SIGNAL => {
-                let v = data_row.value.parse::<i64>();
-                d.signal = v.clone().ok();
-                dp.field(SIGNAL, v.unwrap_or_default() as i64)
-            }
-            _ => {
-                continue;
-            }
-        };
-        */
+        if use_influxdb_3 {
+            let mut wq = influxdb::Timestamp::Seconds(chrono::Utc::now().timestamp() as u128)
+                .into_query(&influxdb3_settings.table);
+
+            wq = wq
+                .add_tag(CHIP_ID, chip_id)
+                .add_tag(CITY, d.city.clone())
+                .add_tag(LAT, d.lat.to_string())
+                .add_tag(LON, d.lon.to_string())
+                .add_tag(SENSOR_ID, sensor_id)
+                .add_tag(SENSOR_TYPE, sensor_type.to_owned())
+                .add_tag(INFO, d.info.clone());
+
+            wq = wq.add_field(field_name.as_str(), v.unwrap_or_default() as f64);
+            write_queries.push(wq);
+        } else {
+            let mut dp = influxdb2::models::DataPoint::builder(&influxdb_settings.measurement);
+
+            dp = dp
+                .tag(CHIP_ID, chip_id)
+                .tag(CITY, d.city.clone())
+                .tag(LAT, d.lat.to_string())
+                .tag(LON, d.lon.to_string())
+                .tag(SENSOR_ID, sensor_id)
+                .tag(SENSOR_TYPE, sensor_type)
+                .tag(INFO, d.info.clone());
+
+            dp = dp.field(field_name.as_str(), v.unwrap_or_default() as f64);
+            points.push(dp.build()?);
+        }
     }
 
     if let Err(e) = write_csv(file_path, &d) {
@@ -261,23 +332,39 @@ pub async fn write(
         .redirect(reqwest::redirect::Policy::none())
         .danger_accept_invalid_certs(true);
 
-    let builder = influxdb2::ClientBuilder::with_builder(
-        req_builder,
-        &influxdb_settings.url,
-        &influxdb_settings.org,
-        &influxdb_settings.token,
-    );
-    let client = builder.build()?;
+    if use_influxdb_3 {
+        let mut client =
+            influxdb::Client::new(&influxdb3_settings.url, &influxdb3_settings.database);
+        if influxdb3_settings.token.len() > 0 {
+            client = client.with_token(&influxdb3_settings.token);
+        }
 
-    if let Err(e) = client
-        .write(&influxdb_settings.bucket, futures::stream::iter(points))
-        .await
-    {
-        tracing::error!(
-            "Error trying to write to InfluxDB at {}: {}",
+        if let Err(e) = client.query(&write_queries).await {
+            tracing::error!(
+                "Error trying to write to InfluxDB at {}: {}",
+                &influxdb3_settings.url,
+                e
+            );
+        }
+    } else {
+        let builder = influxdb2::ClientBuilder::with_builder(
+            req_builder,
             &influxdb_settings.url,
-            e
+            &influxdb_settings.org,
+            &influxdb_settings.token,
         );
+        let client = builder.build()?;
+
+        if let Err(e) = client
+            .write(&influxdb_settings.bucket, futures::stream::iter(points))
+            .await
+        {
+            tracing::error!(
+                "Error trying to write to InfluxDB at {}: {}",
+                &influxdb_settings.url,
+                e
+            );
+        }
     }
 
     Ok(())
