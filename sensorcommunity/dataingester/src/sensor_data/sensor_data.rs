@@ -293,8 +293,8 @@ pub async fn write(
             wq = wq
                 .add_tag(CHIP_ID, chip_id)
                 .add_tag(CITY, d.city.clone())
-                .add_tag(LAT, d.lat.to_string())
-                .add_tag(LON, d.lon.to_string())
+                .add_tag(LAT, d.lat)
+                .add_tag(LON, d.lon)
                 .add_tag(SENSOR_ID, sensor_id)
                 .add_tag(SENSOR_TYPE, sensor_type.to_owned())
                 .add_tag(INFO, d.info.clone());
