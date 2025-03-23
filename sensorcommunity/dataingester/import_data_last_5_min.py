@@ -4,9 +4,11 @@ import os
 from dateutil import parser
 import json
 
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
-from influxdb_client.client.exceptions import InfluxDBError
+from influxdb_client_3 import(InfluxDBClient3,
+                              write_client_options,
+                              WriteOptions,
+                              Point,
+                              InfluxDBError)
 
 import requests
 import urllib3
@@ -46,33 +48,32 @@ user_agents = [
 
 print(f"importing data")
 sensors_file_path = basepath.joinpath('./sensors.csv')
-chips_file_path = basepath.joinpath('./chips.csv')
 
-chip_info_by_id = {}
+import sensor_cache;
 
-try:
-    csv_file = open(chips_file_path, 'r')
-except FileNotFoundError:
-    print(f'file not found {chips_file_path}')
-else:
-    with csv_file:
-        print(f"parsing {chips_file_path} and loading cache")
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        line_count = -1
-        points = []
+# Get environment variables
+start, end, sensor_ids, influxdb3_config = sensor_cache.et_environment_variables()
 
-        for row in csv_reader:
-            line_count += 1
-            if line_count == 0:
-                continue
-            if len(row) == 0:
-                continue
-            chip_id=row[0]
-            lat=row[1]
-            lon=row[2]
-            city=row[3]
-            description=row[4]
-            chip_info_by_id[chip_id] = (lat,lon,city,description)
+# Define callbacks for write responses
+def success(self, data: str):
+    status = "Success writing batch: data"
+    assert status.startswith('Success'), f"Expected {status} to be success"
+
+def error(self, data: str, err: InfluxDBError):
+    status = f"Error writing batch: config: {self}, error: {err}"
+    assert status.startswith('Success'), f"Expected {status} to be success"
+
+
+def retry(self, data: str, err: InfluxDBError):
+    status = f"Retry error writing batch: config: {self}, error: {err}"
+    assert status.startswith('Success'), f"Expected {status} to be success"
+
+# Instantiate WriteOptions for batching
+write_options = WriteOptions()
+wco = write_client_options(success_callback=success,
+                            error_callback=error,
+                            retry_callback=retry,
+                            write_options=write_options)
 
 try:
     csv_file = open(sensors_file_path, 'r')
@@ -97,7 +98,7 @@ else:
             sensor_id=row[1]
             sensor_type=row[2].upper
 
-            chip_info = chip_info_by_id.get(chip_id)
+            chip_info = sensor_cache.chip_info_by_id.get(chip_id)
             if chip_info is None:
                 continue
 
@@ -177,12 +178,16 @@ else:
             os.remove(filename)
 
         if len(points) > 0:
-            with InfluxDBClient.from_config_file(conn_file) as client:
-                with client.write_api(write_options=SYNCHRONOUS) as writer:
-                    try:
-                        writer.write(bucket="sensorcommunity", record=points)
-                    except InfluxDBError as e:
-                        print(f'InfluxDB error: {e}')
+
+            # Use the with...as statement to ensure the file is properly closed and resources
+            # are released.
+            with InfluxDBClient3(host=influxdb3_config.get("INFLUXDB3_HOST"),
+                                database=influxdb3_config.get("INFLUXDB3_DATABASE"),
+                                token=influxdb3_config.get("INFLUXDB3_TOKEN"),
+                                # org=influxdb3_config.get("INFLUXDB3_ORG"),
+                                ssl=False,
+                                write_client_options=wco) as client:
+                client.write(record=points)
         else:
             print(f'No data to import into InfluxDB')
 
