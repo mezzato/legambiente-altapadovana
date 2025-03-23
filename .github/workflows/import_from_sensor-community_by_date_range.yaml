@@ -1,4 +1,4 @@
-name: "Import data from Sensor Community"
+name: "Import from Sensor Community by date range"
 run-name: "qr: Import sensor IDs: ${{ inputs.sensors }}, from ${{ inputs.start }} to  ${{ inputs.end }}"
 on:
   workflow_dispatch:
