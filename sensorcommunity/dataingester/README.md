@@ -10,7 +10,7 @@
   sudo apt install python3.12-venv
   
   python3 -m venv .venv
-  .venv/bin/pip install influxdb-client python-dateutil requests
+  .venv/bin/pip install influxdb3-python python-dateutil requests
   ```
 
 - Generate the config.json file. 

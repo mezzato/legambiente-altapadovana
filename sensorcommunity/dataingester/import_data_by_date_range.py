@@ -2,11 +2,13 @@
 
 import os
 from dateutil import parser
-import json
 
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
-from influxdb_client.client.exceptions import InfluxDBError
+from influxdb_client_3 import(InfluxDBClient3,
+                              write_client_options,
+                              WriteOptions,
+                              Point,
+                              InfluxDBError)
+
 
 import requests
 import urllib3
@@ -23,7 +25,6 @@ import sensor_cache;
 
 mirror_path = "./mirror"
 mpath = basepath.joinpath(mirror_path)
-conn_file = basepath.joinpath("./config.json")
 
 import os
 import sys
@@ -35,7 +36,7 @@ def get_environment_variables():
     Set default values if they are not set.
     
     Returns:
-        tuple: (start_datetime, end_datetime, sensors_list)
+        tuple: (start_datetime, end_datetime, sensors_list, config)
     """
     # Get START environment variable with default
     start_str = os.environ.get("START")
@@ -82,7 +83,48 @@ def get_environment_variables():
         sensors_list = []
         print(f"SENSORS environment variable not set. Using default: {', '.join(sensors_list)}")
     
-    return start_datetime, end_datetime, sensors_list
+    """
+    Retrieves InfluxDB 3 configuration from environment variables.
+    
+    Returns:
+        Dict containing the InfluxDB 3 configuration parameters.
+        
+    Raises:
+        SystemExit: If any required environment variables are missing.
+    """
+    
+    required_vars = [
+        "INFLUXDB3_HOST",
+        "INFLUXDB3_DATABASE",
+        "INFLUXDB3_TOKEN",
+        "INFLUXDB3_TABLE",
+    ]
+
+    optional_vars =  [
+        "INFLUXDB3_ORG"
+    ]
+    
+    config = {}
+    missing_vars = []
+    
+    for var in required_vars:
+        value = os.environ.get(var)
+        if value is None:
+            missing_vars.append(var)
+        else:
+            config[var] = value
+
+    for var in optional_vars:
+        value = os.environ.get(var)
+        if value is not None:
+            config[var] = value
+    
+    if missing_vars:
+        print(f"Error: Missing required environment variables: {', '.join(missing_vars)}")
+        sys.exit(1)
+    
+
+    return start_datetime, end_datetime, sensors_list, config
 
 def safe_float_convert(value):
     try:
@@ -93,10 +135,6 @@ def safe_float_convert(value):
         return None
 
 def main():
-
-    if not conn_file.exists():
-        print(f'config file not found {conn_file}')
-        exit()
 
     try:
         mpath.mkdir(parents=True, exist_ok=True)
@@ -118,7 +156,7 @@ def main():
     print(f"importing data")
 
     # Get environment variables
-    start, end, sensor_ids = get_environment_variables()
+    start, end, sensor_ids, influxdb3_config = get_environment_variables()
     
     # Print the parsed variables
     print("\nParsed Environment Variables:")
@@ -136,6 +174,29 @@ def main():
 
     current_date = start
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    status = None
+
+    # Define callbacks for write responses
+    def success(self, data: str):
+        status = "Success writing batch: data"
+        assert status.startswith('Success'), f"Expected {status} to be success"
+
+    def error(self, data: str, err: InfluxDBError):
+        status = f"Error writing batch: config: {self}, error: {err}"
+        assert status.startswith('Success'), f"Expected {status} to be success"
+
+
+    def retry(self, data: str, err: InfluxDBError):
+        status = f"Retry error writing batch: config: {self}, error: {err}"
+        assert status.startswith('Success'), f"Expected {status} to be success"
+
+    # Instantiate WriteOptions for batching
+    write_options = WriteOptions()
+    wco = write_client_options(success_callback=success,
+                                error_callback=error,
+                                retry_callback=retry,
+                                write_options=write_options)
 
     while current_date <= end:
         for sensor in sensor_cache.sensors:
@@ -202,7 +263,7 @@ def main():
                     if len(row) == 0:
                         continue
 
-                    point = Point("particolato")
+                    point = Point(influxdb3_config.get("INFLUXDB3_TABLE"))
                     
                     # sensor_id;sensor_type;location;lat;lon;timestamp;P1;durP1;ratioP1;P2;durP2;ratioP2
                     # 88089;SDS011;81096;45.566;11.932;2025-03-13T00:00:51;4.03;;;1.63;;
@@ -228,12 +289,24 @@ def main():
                     points.append(point)
 
                 if len(points) > 0:
+
+                    # Use the with...as statement to ensure the file is properly closed and resources
+                    # are released.
+                    with InfluxDBClient3(host=influxdb3_config.get("INFLUXDB3_HOST"),
+                                        database=influxdb3_config.get("INFLUXDB3_DATABASE"),
+                                        token=influxdb3_config.get("INFLUXDB3_TOKEN"),
+                                        # org=influxdb3_config.get("INFLUXDB3_ORG"),
+                                        ssl=False,
+                                        write_client_options=wco) as client:
+                        client.write(record=points)
+                    '''
                     with InfluxDBClient.from_config_file(conn_file) as client:
                         with client.write_api(write_options=SYNCHRONOUS) as writer:
                             try:
                                 writer.write(bucket="sensorcommunity", record=points)
                             except InfluxDBError as e:
-                                print(f'InfluxDB error: {e}')
+                                print(f'InfluxDB error: {e}')'
+                    '''
                 else:
                     print(f'No data to import into InfluxDB')
                     
