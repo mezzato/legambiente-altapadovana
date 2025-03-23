@@ -30,12 +30,6 @@ jobs:
         working-directory: ./sensorcommunity/dataingester
         run: |
           ./install_influxdb_python_cli.sh
-        env:
-          INFLUXDB3_DATABASE: ${{ vars.INFLUXDB3_DATABASE }}
-          INFLUXDB3_HOST: ${{ vars.INFLUXDB3_HOST }}
-          INFLUXDB3_TABLE: ${{ vars.INFLUXDB3_TABLE }}
-          INFLUXDB3_ORG: ${{ vars.INFLUXDB3_ORG }}
-          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
       - name: Import daily data from Sensor Community for specific sensors
         working-directory: ./sensorcommunity/dataingester
         run: |
@@ -45,3 +39,8 @@ jobs:
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
           SENSORS: ${{ inputs.sensors }}
+          INFLUXDB3_DATABASE: ${{ vars.INFLUXDB3_DATABASE }}
+          INFLUXDB3_HOST: ${{ vars.INFLUXDB3_HOST }}
+          INFLUXDB3_TABLE: ${{ vars.INFLUXDB3_TABLE }}
+          INFLUXDB3_ORG: ${{ vars.INFLUXDB3_ORG }}
+          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
