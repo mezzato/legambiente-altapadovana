@@ -39,7 +39,7 @@ jobs:
       - name: Import daily data from Sensor Community for specific sensors
         working-directory: ./sensorcommunity/dataingester
         run: |
-          source .venv/activate
+          source .venv/bin/activate
           ./import_data_by_date_range.py
         env:
           START: ${{ inputs.start }}
