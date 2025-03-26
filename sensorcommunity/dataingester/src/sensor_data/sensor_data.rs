@@ -6,76 +6,14 @@ use chrono::Utc;
 use influxdb::InfluxDbWriteable;
 use serde::{Deserialize, Serialize};
 
+use super::{
+    BME280_HUMIDITY, BME280_PRESSURE, BME280_TEMPERATURE, BMP_PRESSURE, BMP_TEMPERATURE, CHIP_ID,
+    CITY, DUR_P1, DUR_P2, HUMIDITY, INFO, LAT, LON, P1, P2, RATIO_P1, RATIO_P2, SDS_P1, SDS_P2,
+    SENSOR_ID, SENSOR_TYPE, SIGNAL, TEMPERATURE,
+};
+
 // "Time", durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
 // chip_id;lat;lon;timestamp;P1;durP1;ratioP1;P2;durP2;ratioP2;temperature;humidity;pressure;signal
-
-const CHIP_ID: &str = "chip_id";
-const SENSOR_ID: &str = "sensor_id";
-const SENSOR_TYPE: &str = "sensor_type";
-const LAT: &str = "lat";
-const LON: &str = "lon";
-const CITY: &str = "city";
-const INFO: &str = "info";
-
-//const TIMESTAMP: &str = "timestamp";
-const P1: &str = "P1";
-const SDS_P1: &str = "SDS_P1";
-const DUR_P1: &str = "durP1";
-const RATIO_P1: &str = "ratioP1";
-const P2: &str = "P2";
-
-const SDS_P2: &str = "SDS_P2";
-const DUR_P2: &str = "durP2";
-const RATIO_P2: &str = "ratioP2";
-const TEMPERATURE: &str = "temperature";
-const BMP_TEMPERATURE: &str = "BMP_temperature";
-const BME280_TEMPERATURE: &str = "BMP280_temperature";
-const HUMIDITY: &str = "humidity";
-const BMP_PRESSURE: &str = "BMP_pressure";
-const BME280_HUMIDITY: &str = "BME280_humidity";
-const BME280_PRESSURE: &str = "BME280_pressure";
-
-const SIGNAL: &str = "signal";
-
-// Note that structs can derive both Serialize and Deserialize!
-#[derive(Debug, Serialize, Default)]
-pub struct DataRecord<'a> {
-    chip_id: &'a str,
-    lat: f64,
-    lon: f64,
-    timestamp: i64,
-    #[serde(rename = "P1")]
-    p1: Option<f64>,
-    #[serde(rename = "ratioP1")]
-    ratio_p1: Option<f64>,
-    #[serde(rename = "durP1")]
-    dur_p1: Option<i64>,
-    #[serde(rename = "P2")]
-    p2: Option<f64>,
-    #[serde(rename = "ratioP2")]
-    ratio_p2: Option<f64>,
-    #[serde(rename = "durP2")]
-    dur_p2: Option<i64>,
-    #[serde(rename = "SDS_P1")]
-    sds_p1: Option<f64>,
-    #[serde(rename = "SDS_P2")]
-    sds_p2: Option<f64>,
-    temperature: Option<f64>,
-    humidity: Option<f64>,
-    #[serde(rename = "BMP_temperature")]
-    bmp_temperature: Option<f64>,
-    #[serde(rename = "BMP_pressure")]
-    bmp_pressure: Option<f64>,
-    #[serde(rename = "BME280_temperature")]
-    bmp280_temperature: Option<f64>,
-    #[serde(rename = "BMP280_humidity")]
-    bmp280_humidity: Option<f64>,
-    #[serde(rename = "BMP280_pressure")]
-    bmp280_pressure: Option<f64>,
-    signal: Option<i64>,
-    city: String,
-    info: String,
-}
 
 /*
 #[derive(InfluxDbWriteable)]
@@ -104,11 +42,13 @@ pub struct SensorValue {
 
 pub fn get_sensor_id(
     sensor_cache: &Cache<crate::SensorInfo>,
-    cache_id: &str,
+    chip_id: &str,
+    sensor_type: &str,
 ) -> Result<String, anyhow::Error> {
+    let cache_id = format!("{}:{}", chip_id, sensor_type);
     match sensor_cache.read() {
         Ok(cache) => {
-            if let Some(info) = cache.get(cache_id) {
+            if let Some(info) = cache.get(&cache_id) {
                 Ok(info.sensor_id.to_owned())
             } else {
                 Err(anyhow!("missing sensory id for key: {}", cache_id))
@@ -133,7 +73,7 @@ pub async fn write(
 
     let timestamp = Utc::now().timestamp();
 
-    let mut d = DataRecord::default();
+    let mut d = crate::sensor_data::DataRecord::default();
 
     match chip_cache.read() {
         Ok(cache) => {
@@ -270,8 +210,7 @@ pub async fn write(
             }
         };
 
-        let sensor_id = match get_sensor_id(&sensor_cache, &format!("{}:{}", chip_id, &sensor_type))
-        {
+        let sensor_id = match get_sensor_id(&sensor_cache, chip_id, &sensor_type) {
             Ok(id) => id,
             Err(e) => {
                 tracing::error!(
@@ -370,7 +309,7 @@ pub async fn write(
 
 pub fn write_csv(
     file_path: &std::path::PathBuf,
-    d: &DataRecord<'_>,
+    d: &crate::sensor_data::DataRecord<'_>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = OpenOptions::new()
         .write(true)

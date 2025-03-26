@@ -4,7 +4,7 @@ mod http;
 mod logging;
 mod sensor_data;
 
-use crate::config::{Arg, Command, crate_version, init_cli};
+use crate::config::{Arg, Command, Context, Manifest, crate_version, init_cli};
 use axum::{
     BoxError, Router,
     handler::HandlerWithoutStateExt,
@@ -15,6 +15,7 @@ use axum::{
 use axum_extra::extract::Host;
 use axum_server::tls_rustls::RustlsConfig;
 use serde::{Deserialize, Serialize};
+use walkdir::WalkDir;
 
 use crate::cache::{CacheKey, load_cache};
 use anyhow::Result;
@@ -77,10 +78,17 @@ async fn main() {
                 .help("Sets a custom config file path")
                 .default_value(MANIFEST_NAME),
         )
-        .arg(
-            Arg::new("reset_auth_key")
-                .long("reset_auth_key")
-                .help("Resets the authorization token"),
+        .subcommand_required(true)
+        .subcommand(clap::command!("serve"))
+        .subcommand(
+            clap::command!("import").arg(
+                Arg::new("dir")
+                    .short('d')
+                    .long("dir")
+                    .value_name("DIRECTORY")
+                    .help("Import data from csv file in folder and subfolders.")
+                    .value_parser(clap::value_parser!(std::path::PathBuf)),
+            ),
         )
         .get_matches();
 
@@ -89,8 +97,31 @@ async fn main() {
         _ => MANIFEST_NAME,
     };
 
-    let (config, _log_guard, ctx) = init_cli(config_path).unwrap();
+    let (config, log_guard, ctx) = init_cli(config_path).unwrap();
 
+    match matches.subcommand() {
+        Some(("serve", _matches)) => {
+            serve(config, log_guard, ctx).await;
+        }
+        Some(("import", matches)) => {
+            let dir = match matches.get_one::<std::path::PathBuf>("dir") {
+                Some(d) => d,
+                _ => {
+                    tracing::error!("invalid import directory");
+                    return;
+                }
+            };
+            import(config, log_guard, ctx, dir).await;
+        }
+        _ => unreachable!("clap should ensure we don't get here"),
+    };
+}
+
+async fn serve(
+    config: Manifest,
+    _log_guard: tracing_appender::non_blocking::WorkerGuard,
+    ctx: Context,
+) {
     tracing::debug!("working directory: {}", ctx.working_dir.display());
 
     let chips_filepath = shellexpand::env(&config.chips_filepath.as_os_str().to_string_lossy())
@@ -237,182 +268,6 @@ async fn shutdown_signal(handle: axum_server::Handle) {
     // to force shutdown
 }
 
-// {"esp8266id": "15303512", "software_version": "NRZ-2024-135", "sensordatavalues":[{"value_type":"SDS_P1","value":"67.22"},{"value_type":"SDS_P2","value":"34.47"},{"value_type":"temperature","value":"2.00"},{"value_type":"humidity","value":"38.40"},{"value_type":"samples","value":"5403023"},{"value_type":"min_micro","value":"25"},{"value_type":"max_micro","value":"73179"},{"value_type":"interval","value":"145000"},{"value_type":"signal","value":"-70"}]}
-
-/*
-#[derive(Clone)]
-struct ReqState {
-    chip_info_cache: Cache<ChipInfo>,
-    sensor_data_dir: PathBuf,
-    measure_name_to_field: HashMap<String, String>,
-    influxdb_settings: config::InfluxDB,
-    logins: HashMap<String, String>,
-}
-
-async fn handler(
-    State(ReqState {
-        chip_info_cache,
-        sensor_data_dir,
-        measure_name_to_field,
-        influxdb_settings,
-        logins: _,
-    }): State<ReqState>,
-
-    SensorData { json, sensor }: SensorData<sensor_data::Payload>,
-) -> Result<(), AppError> {
-    // tracing::debug!(?sensor, "sensor");
-    // tracing::debug!(?json, "json body");
-    // println!("sensor: {}, json: {:?}", sensor, json);
-
-    let formatted_day = format!("{}", chrono::Utc::now().format("%Y-%m-%d"));
-
-    let root_folder = sensor_data_dir.join(&formatted_day);
-    let file_name = format!("{}_chip_{}.csv", &formatted_day, &sensor);
-
-    if let Err(e) = std::fs::create_dir_all(&root_folder) {
-        tracing::error!(
-            "Error creating sensor data folder at: {}, {}",
-            root_folder.as_os_str().to_string_lossy(),
-            e
-        );
-        return Err(AppError(anyhow!("{}", e)));
-    }
-
-    let file_path = root_folder.join(file_name);
-
-    match sensor_data::write(
-        &influxdb_settings,
-        &file_path,
-        &measure_name_to_field,
-        chip_info_cache,
-        &sensor,
-        json,
-    )
-    .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::error!("Error trying to write data for sensor {}: {}", &sensor, e);
-        }
-    };
-
-    Ok(())
-
-    /*
-    wtr.write_record(&[
-        "Time",
-        ;durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
-    ])?;
-    wtr.write_record(&[
-        "Davidsons Landing",
-        "AK",
-        "",
-        "65.2419444",
-        "-165.2716667",
-    ])?;
-    wtr.write_record(&["Kenai", "AK", "7610", "60.5544444", "-151.2583333"])?;
-    wtr.write_record(&["Oakman", "AL", "", "33.7133333", "-87.3886111"])?;
-
-    wtr.flush()?;
-    */
-}
-
-// extractor that shows how to consume the request body upfront
-// struct BufferRequestBody(Bytes);
-
-const X_SENSOR_HEADER: &str = "x-sensor";
-
-// the state your library needs
-
-impl<S, T> FromRequest<S> for SensorData<T>
-where
-    S: Send + Sync,
-    Json<T>: FromRequest<()>,
-    axum::Json<T>: FromRequest<S, Rejection = JsonRejection>,
-    T: 'static,
-    ReqState: FromRef<S>,
-{
-    type Rejection = (StatusCode, axum::Json<serde_json::Value>);
-
-    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        // tracing::debug!(request = ?req);
-
-        // Extract the token from the authorization header
-        let sensor_header = req.headers().get(X_SENSOR_HEADER);
-        let sensor = sensor_header.and_then(|value| value.to_str().ok());
-        let sensor = sensor.unwrap_or_default().to_owned();
-
-        let (mut parts, body) = req.into_parts();
-
-        let creds = match parts.extract::<TypedHeader<Authorization<Basic>>>().await {
-            Ok(TypedHeader(Authorization(bearer))) => bearer,
-            Err(_) => {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({
-                        "error": "missing credentials",
-                    })),
-                ));
-            }
-        };
-
-        let mystate: ReqState = ReqState::from_ref(state);
-
-        let pwd = mystate
-            .logins
-            .get(&creds.username().to_lowercase())
-            .ok_or((
-                StatusCode::UNAUTHORIZED,
-                Json(json!({
-                    "error": "wrong credentials",
-                })),
-            ))?;
-
-        if pwd != creds.password() {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "Unauthorized"})),
-            ));
-        };
-
-        // tracing::debug!(headers = ?parts.headers);
-        // tracing::debug!(body = ?body);
-
-        // We can use other extractors to provide better rejection messages.
-        // For example, here we are using `axum::extract::MatchedPath` to
-        // provide a better error message.
-        //
-        // Have to run that first since `Json` extraction consumes the request.
-        let path = parts
-            .extract::<axum::extract::MatchedPath>()
-            .await
-            .map(|path| path.as_str().to_owned())
-            .ok();
-
-        let req = Request::from_parts(parts, body);
-
-        let json = match axum::Json::<T>::from_request(req, state).await {
-            Ok(value) => Ok(value.0),
-            // convert the error from `axum::Json` into whatever we want
-            Err(rejection) => {
-                // println!("--- rejection: {}", rejection.body_text());
-                let payload = json!({
-                    "message": rejection.body_text(),
-                    "origin": "custom_extractor",
-                    "path": path,
-                });
-
-                Err((rejection.status(), axum::Json(payload)))
-            }
-        }?;
-
-        let data = SensorData { json, sensor };
-
-        Ok(data)
-    }
-}
-*/
-
 async fn redirect_http_to_https<F>(addrs: Addresses, signal: F)
 where
     F: Future<Output = ()> + Send + 'static,
@@ -463,4 +318,45 @@ where
         .with_graceful_shutdown(signal)
         .await
         .unwrap();
+}
+
+async fn import(
+    config: Manifest,
+    _log_guard: tracing_appender::non_blocking::WorkerGuard,
+    _ctx: Context,
+    dir: &PathBuf,
+) {
+    let sensors_filepath = shellexpand::env(&config.sensors_filepath.as_os_str().to_string_lossy())
+        .unwrap()
+        .as_ref()
+        .to_owned();
+
+    // load chip cache with hot reload
+    let (sensor_cache, _watcher) = match load_cache::<SensorInfo>(&sensors_filepath) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("could not load the chip info cache: {}", e);
+            return;
+        }
+    };
+    // Walk through directory and all subdirectories
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+
+        // Check if the file is a CSV
+        if path.is_file() && path.extension().map_or(false, |ext| ext == "csv") {
+            match sensor_data::import_csv(path, &config, sensor_cache.clone()).await {
+                Ok(r) => {
+                    if r.record_count > 0 {
+                        tracing::info!(
+                            "Successfully imported {} values from: {}",
+                            r.record_count,
+                            path.display()
+                        );
+                    }
+                }
+                Err(e) => tracing::error!("Error loading CSV {}: {}", path.display(), e),
+            }
+        }
+    }
 }

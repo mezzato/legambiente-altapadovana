@@ -546,6 +546,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "walkdir",
  "windows-targets 0.52.6",
 ]
 

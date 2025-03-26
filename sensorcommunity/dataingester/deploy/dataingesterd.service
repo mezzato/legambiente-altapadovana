@@ -3,7 +3,7 @@ Description=dataingester daemon program
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/dataingester \
+ExecStart=/usr/local/bin/dataingester serve \
 	-c /etc/dataingester/dataingester.toml
 User=dataingester
 ExecReload=/bin/kill -HUP $MAINPID

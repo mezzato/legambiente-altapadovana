@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {"START":"2025-03-21", 
+            "INFLUXDB3_DATABASE":"sensorcommunity",
+            "INFLUXDB3_HOST":"http://aerdigitalis.eu:8181",
+            "INFLUXDB3_ORG":"legambiente",
+            "INFLUXDB3_TABLE":"particulate",
+            "INFLUXDB3_TOKEN":"apiv3_DLgdD2kGmyjPsbIVluvgnEvJF1sCCXpyguujy5LyWxMbppSMUmigbIZwjcvPlJ0x-JJKXZctLd4zznwEYf5Hkg",
+            }
+        }
+    ]
+}
