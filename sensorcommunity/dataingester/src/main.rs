@@ -86,7 +86,7 @@ async fn main() {
                     .short('d')
                     .long("dir")
                     .value_name("DIRECTORY")
-                    .help("Import data from csv file in folder and subfolders.")
+                    .help("Import data from csv files in a folder and all subfolders.")
                     .value_parser(clap::value_parser!(std::path::PathBuf)),
             ),
         )
