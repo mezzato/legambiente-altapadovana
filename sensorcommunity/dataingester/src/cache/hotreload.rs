@@ -64,6 +64,7 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
             let event = result.unwrap();
 
             if event.kind.is_modify() {
+                std::thread::sleep(std::time::Duration::from_millis(1000));
                 match load_cache_from_file(&cloned_path) {
                     Ok(new_config) => {
                         tracing::info!("Successfully reloaded cache from file: {}", &cloned_path);
