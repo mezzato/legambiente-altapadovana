@@ -1,0 +1,2 @@
+chip_id,lat,lon,timestamp,P1,ratioP1,durP1,P2,ratioP2,durP2,temperature,humidity,pressure,signal,city,description
+esp8266-15303512,45.630739,11.703086,1741040645,55.08,,,30.33,,,6.3,,,-70,Carmignano di Brenta,centro nord
