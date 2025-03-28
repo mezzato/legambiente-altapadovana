@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use notify::{Error, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Error, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 
 use futures::{
@@ -13,7 +13,7 @@ use futures::{
 
 use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 
-fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
+fn _async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(10);
 
     let conf = notify::Config::default();
@@ -23,11 +23,6 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
     let watcher = RecommendedWatcher::new(
         move |result: std::result::Result<Event, Error>| {
             futures::executor::block_on(async {
-                match &result {
-                    Ok(r) => tracing::info!("Event detected: {:?}", r.kind),
-                    Err(e) => tracing::info!("Event error detected: {}", e),
-                }
-
                 tx.send(result).await.unwrap();
             })
         },
@@ -49,7 +44,7 @@ fn async_debounce_watcher() -> notify::Result<(
         Duration::from_secs(2),
         None,
         move |result: DebounceEventResult| {
-            tracing::info!("Event detected",);
+            // tracing::info!("Event detected",);
             futures::executor::block_on(async {
                 tx.send(result).await.unwrap();
             })
@@ -95,7 +90,13 @@ fn load_cache_from_file<T: CacheKey + serde::de::DeserializeOwned>(
 
 pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'static>(
     path: &str,
-) -> std::result::Result<(Cache<T>, INotifyWatcher), Box<dyn std::error::Error>> {
+) -> std::result::Result<
+    (
+        Cache<T>,
+        Arc<RwLock<Debouncer<RecommendedWatcher, RecommendedCache>>>,
+    ),
+    Box<dyn std::error::Error>,
+> {
     let config = load_cache_from_file(path)?;
 
     // We wrap the data a mutex under an atomic reference counted pointer
@@ -107,47 +108,79 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
 
     let cloned_path = path.to_owned();
 
-    let (mut watcher, mut rx) = async_watcher()?;
+    let (mut watcher, mut rx) = async_debounce_watcher()?;
 
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
+    watcher.watch(path, RecursiveMode::Recursive)?;
+
+    let watcher_lock = Arc::new(RwLock::new(watcher));
+    let watcher_lock_clone = watcher_lock.clone();
 
     tokio::spawn(async move {
-        while let Some(res) = rx.next().await {
-            match res {
-                Ok(event) => {
-                    //for event in events {
-                    if event.kind.is_modify() {
-                        std::thread::sleep(std::time::Duration::from_millis(1000));
-                        match load_cache_from_file(&cloned_path) {
-                            Ok(new_config) => {
+        loop {
+            'outer: while let Some(res) = rx.next().await {
+                match res {
+                    Ok(events) => {
+                        for event in events {
+                            if event.kind.is_modify() {
+                                // std::thread::sleep(std::time::Duration::from_millis(1000));
+                                match load_cache_from_file(&cloned_path) {
+                                    Ok(new_config) => {
+                                        tracing::info!(
+                                            "Successfully reloaded cache from file: {}",
+                                            &cloned_path
+                                        );
+                                        *cloned_config.try_write().unwrap() = new_config
+                                    }
+                                    Err(error) => {
+                                        tracing::error!(
+                                            "Error reloading cache from file {}: {:?}",
+                                            &cloned_path,
+                                            error
+                                        )
+                                    }
+                                }
+                            } else if event.kind.is_remove() {
+                                // reset the watcher
                                 tracing::info!(
-                                    "Successfully reloaded cache from file: {}",
+                                    "Trying to reset watcher for file: {}",
                                     &cloned_path
                                 );
-                                *cloned_config.try_write().unwrap() = new_config
-                            }
-                            Err(error) => {
-                                tracing::error!(
-                                    "Error reloading cache from file {}: {:?}",
-                                    &cloned_path,
-                                    error
-                                )
+                                break 'outer;
                             }
                         }
                     }
-                    // }
+                    Err(errors) => errors.iter().for_each(|e| {
+                        tracing::error!("Error watching file {}: {:?}", &cloned_path, e)
+                    }),
                 }
-                Err(e) => tracing::error!("Error watching file {}: {:?}", &cloned_path, e),
-                /*
-                Err(errors) => errors
-                    .iter()
-                    .for_each(|e| tracing::error!("Error watching file {}: {:?}", &cloned_path, e)),
-                    */
             }
+
+            let mut watcher = match async_debounce_watcher() {
+                Ok((watcher, r)) => {
+                    rx = r;
+                    watcher
+                }
+                Err(e) => {
+                    tracing::error!("Error watching file {}: {:?}", &cloned_path, e);
+                    break;
+                }
+            };
+
+            // Add a path to be watched. All files and directories at that path and
+            // below will be monitored for changes.
+            match watcher.watch(&cloned_path, RecursiveMode::Recursive) {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!("Error watching file {}: {:?}", &cloned_path, e);
+                    break;
+                }
+            }
+            *watcher_lock.write().unwrap() = watcher;
+            tracing::info!("Successfully reset watcher for file: {}", &cloned_path);
         }
     });
 
-    Ok((config, watcher))
+    Ok((config, watcher_lock_clone))
 }
