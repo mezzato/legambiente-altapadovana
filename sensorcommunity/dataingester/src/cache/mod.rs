@@ -1,3 +1,6 @@
 mod hotreload;
 
-pub use hotreload::{load_cache, CacheKey, Cache};
+pub use hotreload::{Cache, CacheKey, load_cache};
+
+
+

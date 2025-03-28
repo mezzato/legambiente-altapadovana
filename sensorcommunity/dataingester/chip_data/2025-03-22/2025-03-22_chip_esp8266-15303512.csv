@@ -1,0 +1,11 @@
+chip_id,sensor_id,sensor_type,lat,lon,timestamp,P1,ratioP1,durP1,P2,ratioP2,durP2,SDS_P1,SDS_P2,temperature,humidity,BMP_temperature,BMP_pressure,BME280_temperature,BMP280_humidity,BMP280_pressure,signal,city,info
+esp8266-15303512,,,45.630739,11.703086,1742650096,,,,,,,18.95,12.75,12.2,53.3,,,,,,-63,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742650263,,,,,,,16.65,12.13,12.2,53.7,,,,,,-63,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742650430,,,,,,,19.4,12.57,12.6,52.8,,,,,,-63,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742650579,,,,,,,18.2,11.88,12.7,52.5,,,,,,-63,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742650727,,,,,,,17.23,13.13,12.8,52.1,,,,,,-63,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742650875,,,,,,,15.65,11.6,12.5,52.4,,,,,,-63,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742651023,,,,,,,16.45,11.8,12.3,52.9,,,,,,-69,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742651171,,,,,,,17.4,11.68,12.3,53.0,,,,,,-69,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742651319,,,,,,,17.4,12.4,12.3,53.0,,,,,,-69,Carmignano di Brenta,centro nord
+esp8266-15303512,,,45.630739,11.703086,1742651466,,,,,,,19.0,13.65,12.4,53.1,,,,,,-69,Carmignano di Brenta,centro nord
