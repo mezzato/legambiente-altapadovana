@@ -200,6 +200,11 @@ def main():
 
     while current_date <= end:
         for sensor in sensor_cache.sensors:
+
+            chip_id = sensor['chip_id']
+            if not chip_id.startswith("_"):
+                print('Skipping chip id: {}'.format(chip_id))
+                continue
             sensor_id = sensor['sensor_id']
 
             if len(sensor_ids) > 0 and not sensor_id in sensor_ids:
