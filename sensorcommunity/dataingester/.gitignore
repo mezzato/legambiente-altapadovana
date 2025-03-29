@@ -1,6 +1,6 @@
 target
 dataingester.toml
-./chip_data
+chip_data
 config.json
 .venv
 bin
