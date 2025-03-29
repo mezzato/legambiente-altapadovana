@@ -167,6 +167,10 @@ pub async fn import_csv(
                     let value = match record.get(field_idx) {
                         None => continue,
                         Some(s) => {
+                            let s = s.trim();
+                            if s.len() == 0 {
+                                continue;
+                            }
                             let v = s.parse::<f64>();
                             if v.is_err() {
                                 tracing::error!(

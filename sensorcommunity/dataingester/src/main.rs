@@ -340,7 +340,7 @@ async fn import(
         }
     };
     // Walk through directory and all subdirectories
-    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(dir).sort_by_file_name().into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
 
         // Check if the file is a CSV
