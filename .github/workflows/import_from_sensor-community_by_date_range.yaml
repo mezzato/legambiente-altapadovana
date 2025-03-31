@@ -18,6 +18,8 @@ on:
         description: "end date (format 2024-12-27), if missing yesterday"
         required: false
         default: ""
+  schedule:
+    - cron: "0 5 * * *"
 
 jobs:
   import-sensor-community-daily-data:
