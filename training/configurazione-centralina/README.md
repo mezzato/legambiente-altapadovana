@@ -7,6 +7,8 @@ Se non e' possibile farlo si possono comunque registrare le centraline presenti 
 
 Salavare e riavviare la centralina dopo la modifica.
 
+Salvare il chip della centralina per il punto successivo, sara' esp8266-[numero della centralina] (nell'esempio `esp8266-15303512`).
+
 ![configurazione](./centralina.png)
 
 ## Modificare i due file:
