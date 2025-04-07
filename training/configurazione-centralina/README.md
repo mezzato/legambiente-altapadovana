@@ -7,16 +7,22 @@ Se non e' possibile farlo si possono comunque registrare le centraline presenti 
 
 Salavare e riavviare la centralina dopo la modifica.
 
+![configurazione](./centralina.png)
+
+Controllare online sul proprio account il chip ID della centralina, di solito corrisponde a `esp8266-` con aggiunto l'ID evidenziato nella immagine sopra.
+
+![chip ID](./chip_id.png)
+
 Salvare il chip della centralina per il punto successivo, sara' esp8266-[numero della centralina] (nell'esempio `esp8266-15303512`).
 
-![configurazione](./centralina.png)
+
 
 ## Modificare i due file:
 
 - [chips.csv](../../sensorcommunity/dataingester/chips.csv)
 
     Contiene l'anagrafe dei punti di installazione delle centraline con: latitudine, longitudine, citta', dettagli.
-    **Aggiungere una riga per una nuova centralina specificando il chipID della centralina se noto oppure un nome che inizi con `_`, per esempio `_carmignano8`.**
+    **Aggiungere una riga per una nuova centralina specificando il chipID della centralina se noto (`esp8266-15303512` sopra) oppure un nome che inizi con `_`, per esempio `_carmignano8`.**
     **Attenzione: usare il chip id reale presente nella configuraizione della centralina!**
 
     Specificare chip id (chip_id), latitudine (lat), longitudine (lon), citta' (city), informazione aggiuntive (info)
