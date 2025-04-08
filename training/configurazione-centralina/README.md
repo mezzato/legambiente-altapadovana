@@ -15,7 +15,12 @@ Controllare online sul proprio account il chip ID della centralina, di solito co
 
 Salvare il chip della centralina per il punto successivo, sara' esp8266-[numero della centralina] (nell'esempio `esp8266-15303512`).
 
+## Creare un account su Github e ricevere i permessi di scrittura nel repository [legambiente-altapadovana](https://github.com/mezzato/legambiente-altapadovana/)
 
+Se non si ha un account su Github e i relativi permessi:
+
+1. Per creare un account andare su: <https://github.com/signup>
+1. Comunicare lo username scelto all'amministratore di legambiente-altapadovana e attendere i permessi
 
 ## Modificare i due file:
 
