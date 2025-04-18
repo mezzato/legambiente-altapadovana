@@ -2,7 +2,6 @@ chip_id,sensor_id,sensor_type
 esp8266-15303512,62574,SDS011
 esp8266-15303512,62575,DHT22
 _carmignano1,62177,SDS011
-_carmignano2,87891,SDS011
 _carmignano4,88093,SDS011
 _carmignano5,86296,SDS011
 _carmignano5,86297,BME280
