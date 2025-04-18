@@ -1,9 +1,10 @@
 chip_id,lat,lon,city,info
 esp8266-15303512,45.630739,11.703086,Carmignano di Brenta,centro nord
 _carmignano1,45.63749218,11.71378076,Carmignano di Brenta,Brenta
-_carmignano2,45.638,11.714,Carmignano di Brenta,Brenta
 _carmignano4,45.638,11.714,Carmignano di Brenta,Brenta
 _carmignano5,45.63342820,11.70480280,Carmignano di Brenta,Via Albbruck
 _carmignano6,45.624,11.698,Carmignano di Brenta,Viale Europa
 _carmignano7,45.624,11.700,Carmignano di Brenta,Via San Pio X
 esp8266-4763615,45.5278554,11.5597482,Vicenza,Rotonda
+esp8266-14441834,45.47848661,11.60795231,Longare,centro
+
