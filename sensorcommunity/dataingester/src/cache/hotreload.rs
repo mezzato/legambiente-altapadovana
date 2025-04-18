@@ -123,15 +123,32 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
                 match res {
                     Ok(events) => {
                         for event in events {
+                            let mut reload = false;
+                            let mut removed = false;
                             if event.kind.is_modify() {
+                                reload = true;
+                            } else if event.kind.is_remove() {
+                                // reset the watcher
+                                // reload only if a new file exists
+                                reload = std::fs::exists(&cloned_path).unwrap_or_default();
+                                removed = true;
+                                tracing::info!(
+                                    "File removed, trying to reset watcher for file: {}",
+                                    &cloned_path
+                                );
+                            }
+
+                            if reload {
                                 // std::thread::sleep(std::time::Duration::from_millis(1000));
                                 match load_cache_from_file(&cloned_path) {
                                     Ok(new_config) => {
                                         tracing::info!(
-                                            "Successfully reloaded cache from file: {}",
-                                            &cloned_path
+                                            "Successfully reloaded cache from file: {}, items are: {}",
+                                            &cloned_path,
+                                            new_config.len(),
                                         );
-                                        *cloned_config.try_write().unwrap() = new_config
+                                        let mut w = cloned_config.write().unwrap();
+                                        *w = new_config
                                     }
                                     Err(error) => {
                                         tracing::error!(
@@ -141,12 +158,8 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
                                         )
                                     }
                                 }
-                            } else if event.kind.is_remove() {
-                                // reset the watcher
-                                tracing::info!(
-                                    "Trying to reset watcher for file: {}",
-                                    &cloned_path
-                                );
+                            }
+                            if removed {
                                 break 'outer;
                             }
                         }
