@@ -19,7 +19,9 @@ use walkdir::WalkDir;
 
 use crate::cache::{CacheKey, load_cache};
 use anyhow::Result;
-use std::{collections::HashMap, future::Future, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap, future::Future, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration,
+};
 use tokio::signal;
 
 pub const MANIFEST_NAME: &str = "dataingester.toml";
@@ -170,6 +172,23 @@ async fn serve(
         logins.insert(login.username.to_lowercase(), login.password);
     }
 
+    // register writers
+    let mut writers = vec![];
+    if config.influxdb.url.len() > 0 {
+        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
+            crate::sensor_data::InfluxDB2DataWriter::new(config.influxdb),
+        );
+        writers.push(inf);
+    }
+    if config.influxdb3.url.len() > 0 {
+        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
+            crate::sensor_data::InfluxDB3DataWriter::new(config.influxdb3),
+        );
+        writers.push(inf);
+    }
+
+    // let use_influxdb_3 = influxdb_settings.url.len() == 0;
+
     let app = Router::new()
         .route("/write", post(http::handler))
         .with_state(http::ReqState {
@@ -178,8 +197,7 @@ async fn serve(
             sensor_data_dir,
             measure_name_to_field: config.measure_name_to_field,
             measure_name_to_sensor_type: config.measure_name_to_sensor_type,
-            influxdb_settings: config.influxdb,
-            influxdb3_settings: config.influxdb3,
+            writers,
             logins,
         });
     //.layer(middleware::from_fn(print_request_body));
@@ -340,7 +358,11 @@ async fn import(
         }
     };
     // Walk through directory and all subdirectories
-    for entry in WalkDir::new(dir).sort_by_file_name().into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(dir)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
 
         // Check if the file is a CSV

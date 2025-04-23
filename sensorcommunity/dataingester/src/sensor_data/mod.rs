@@ -1,8 +1,11 @@
 mod import_csv;
+mod influxdb2;
+mod influxdb3;
 mod sensor_data;
+use async_trait::async_trait;
 
 use serde::{Deserialize, Serialize};
-pub use {import_csv::import_csv, sensor_data::*};
+pub use {import_csv::import_csv, sensor_data::*, influxdb2::InfluxDB2DataWriter, influxdb3::InfluxDB3DataWriter};
 
 pub const CHIP_ID: &str = "chip_id";
 pub const SENSOR_ID: &str = "sensor_id";
@@ -71,4 +74,25 @@ pub struct DataRecord<'a> {
     pub signal: Option<i64>,
     pub city: String,
     pub info: String,
+}
+
+pub struct RecordValue<'a> {
+    sensor_id: String,
+    sensor_type: &'a str,
+    field: String,
+    value: f64,
+}
+
+pub struct Record<'a> {
+    pub chip_id: &'a str,
+    pub lat: f64,
+    pub lon: f64,
+    pub city: &'a str,
+    pub info: &'a str,
+    pub values: Vec<RecordValue<'a>>,
+}
+
+#[async_trait]
+pub trait DataWriter: Sync + Send {
+    async fn write<'b>(&self, rec: &Record<'b>) -> anyhow::Result<()>;
 }

@@ -35,6 +35,7 @@ base64 = "0.22.1"
 influxdb = "0.7.2"
 walkdir = "2.5.0"
 notify-debouncer-full = "0.5.0"
+async-trait = "0.1.88"
 
 [target.'cfg(not(windows))'.dependencies]
 rustix = { version = "0.38.34", default-features = false, features = [

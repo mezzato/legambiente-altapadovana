@@ -1,8 +1,4 @@
-use crate::{
-    ChipInfo, SensorData, SensorInfo,
-    config::{self},
-    sensor_data,
-};
+use crate::{ChipInfo, SensorData, SensorInfo, sensor_data};
 use axum::{
     Json, RequestPartsExt,
     extract::{FromRef, FromRequest, Request, State, rejection::JsonRejection},
@@ -18,7 +14,7 @@ use tracing::{Level, enabled};
 use crate::cache::Cache;
 use anyhow::{Result, anyhow};
 use serde_json::json;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 // Use anyhow, define error and enable '?'
 // For a simplified example of using anyhow in axum check /examples/anyhow-error-response
@@ -52,8 +48,7 @@ pub struct ReqState {
     pub sensor_data_dir: PathBuf,
     pub measure_name_to_field: HashMap<String, String>,
     pub measure_name_to_sensor_type: HashMap<String, String>,
-    pub influxdb_settings: config::InfluxDB,
-    pub influxdb3_settings: config::InfluxDB3,
+    pub writers: Vec<Arc<dyn crate::sensor_data::DataWriter>>,
     pub logins: HashMap<String, String>,
 }
 
@@ -64,8 +59,7 @@ pub async fn handler(
         sensor_data_dir,
         measure_name_to_field,
         measure_name_to_sensor_type,
-        influxdb_settings,
-        influxdb3_settings,
+        writers,
         logins: _,
     }): State<ReqState>,
 
@@ -92,8 +86,7 @@ pub async fn handler(
     let file_path = root_folder.join(file_name);
 
     match sensor_data::write(
-        &influxdb_settings,
-        &influxdb3_settings,
+        &writers,
         &file_path,
         &measure_name_to_field,
         &measure_name_to_sensor_type,

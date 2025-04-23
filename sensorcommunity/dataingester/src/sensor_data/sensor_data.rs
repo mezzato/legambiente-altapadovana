@@ -1,15 +1,13 @@
-use std::{collections::HashMap, fs::OpenOptions, io::Seek};
+use std::{collections::HashMap, fs::OpenOptions, io::Seek, sync::Arc};
 
 use crate::cache::Cache;
 use anyhow::{Result, anyhow};
 use chrono::Utc;
-use influxdb::InfluxDbWriteable;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    BME280_HUMIDITY, BME280_PRESSURE, BME280_TEMPERATURE, BMP_PRESSURE, BMP_TEMPERATURE, CHIP_ID,
-    CITY, DUR_P1, DUR_P2, HUMIDITY, INFO, LAT, LON, P1, P2, RATIO_P1, RATIO_P2, SDS_P1, SDS_P2,
-    SENSOR_ID, SENSOR_TYPE, SIGNAL, TEMPERATURE,
+    BME280_HUMIDITY, BME280_PRESSURE, BME280_TEMPERATURE, BMP_PRESSURE, BMP_TEMPERATURE, DUR_P1, DUR_P2, HUMIDITY, P1, P2, RATIO_P1, RATIO_P2, SDS_P1, SDS_P2,
+    SIGNAL, TEMPERATURE,
 };
 
 // "Time", durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
@@ -59,8 +57,9 @@ pub fn get_sensor_id(
 }
 
 pub async fn write(
-    influxdb_settings: &crate::config::InfluxDB,
-    influxdb3_settings: &crate::config::InfluxDB3,
+    writers: &[Arc<dyn crate::sensor_data::DataWriter>],
+    // influxdb_settings: &crate::config::InfluxDB,
+    // influxdb3_settings: &crate::config::InfluxDB3,
     file_path: &std::path::PathBuf,
     measure_name_to_field: &HashMap<String, String>,
     measure_name_to_sensor_type: &HashMap<String, String>,
@@ -102,11 +101,14 @@ pub async fn write(
     d.timestamp = timestamp;
     d.chip_id = chip_id;
 
-    let mut points = vec![];
-
-    let mut write_queries = Vec::<influxdb::WriteQuery>::new();
-
-    let use_influxdb_3 = influxdb_settings.url.len() == 0;
+    let mut rec = crate::sensor_data::Record {
+        chip_id,
+        lat: d.lat,
+        lon: d.lon,
+        city: &d.city,
+        info: &d.info,
+        values: vec![],
+    };
 
     for data_row in payload.sensordatavalues {
         // write csv first
@@ -223,38 +225,14 @@ pub async fn write(
             }
         };
 
-        let v = data_row.value.parse::<f64>();
+        let v = data_row.value.parse::<f64>().unwrap_or_default() as f64;
 
-        if use_influxdb_3 {
-            let mut wq = influxdb::Timestamp::Seconds(chrono::Utc::now().timestamp() as u128)
-                .into_query(&influxdb3_settings.table);
-
-            wq = wq
-                .add_tag(CHIP_ID, chip_id)
-                .add_tag(CITY, d.city.clone())
-                .add_tag(LAT, d.lat)
-                .add_tag(LON, d.lon)
-                .add_tag(SENSOR_ID, sensor_id)
-                .add_tag(SENSOR_TYPE, sensor_type.to_owned())
-                .add_tag(INFO, d.info.clone());
-
-            wq = wq.add_field(field_name.as_str(), v.unwrap_or_default() as f64);
-            write_queries.push(wq);
-        } else {
-            let mut dp = influxdb2::models::DataPoint::builder(&influxdb_settings.measurement);
-
-            dp = dp
-                .tag(CHIP_ID, chip_id)
-                .tag(CITY, d.city.clone())
-                .tag(LAT, d.lat.to_string())
-                .tag(LON, d.lon.to_string())
-                .tag(SENSOR_ID, sensor_id)
-                .tag(SENSOR_TYPE, sensor_type)
-                .tag(INFO, d.info.clone());
-
-            dp = dp.field(field_name.as_str(), v.unwrap_or_default() as f64);
-            points.push(dp.build()?);
-        }
+        rec.values.push(crate::sensor_data::RecordValue {
+            sensor_id: sensor_id.clone(),
+            sensor_type,
+            field: field_name.clone(),
+            value: v,
+        });
     }
 
     if let Err(e) = write_csv(file_path, &d) {
@@ -265,45 +243,90 @@ pub async fn write(
         );
     }
 
-    let req_builder = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .danger_accept_invalid_certs(true);
-
-    if use_influxdb_3 {
-        let mut client =
-            influxdb::Client::new(&influxdb3_settings.url, &influxdb3_settings.database);
-        if influxdb3_settings.token.len() > 0 {
-            client = client.with_token(&influxdb3_settings.token);
-        }
-
-        if let Err(e) = client.query(&write_queries).await {
-            tracing::error!(
-                "Error trying to write to InfluxDB at {}: {}",
-                &influxdb3_settings.url,
-                e
-            );
-        }
-    } else {
-        let builder = influxdb2::ClientBuilder::with_builder(
-            req_builder,
-            &influxdb_settings.url,
-            &influxdb_settings.org,
-            &influxdb_settings.token,
-        );
-        let client = builder.build()?;
-
-        if let Err(e) = client
-            .write(&influxdb_settings.bucket, futures::stream::iter(points))
-            .await
-        {
-            tracing::error!(
-                "Error trying to write to InfluxDB at {}: {}",
-                &influxdb_settings.url,
-                e
-            );
+    for w in writers {
+        if let Err(e) = w.write(&rec).await {
+            tracing::error!("Error trying to write record: {}", e);
         }
     }
 
+    /*
+        let use_influxdb_3 = influxdb_settings.url.len() == 0;
+
+        if use_influxdb_3 {
+            let mut write_queries = Vec::<influxdb::WriteQuery>::new();
+
+            let now = chrono::Utc::now().timestamp() as u128;
+
+            for rc in rec.values {
+                let mut wq = influxdb::Timestamp::Seconds(now).into_query(&influxdb3_settings.table);
+
+                wq = wq
+                    .add_tag(CHIP_ID, rec.chip_id)
+                    .add_tag(CITY, rec.city)
+                    .add_tag(LAT, rec.lat)
+                    .add_tag(LON, rec.lon)
+                    .add_tag(INFO, rec.info)
+                    .add_tag(SENSOR_ID, rc.sensor_id)
+                    .add_tag(SENSOR_TYPE, rc.sensor_type.to_owned());
+
+                wq = wq.add_field(rc.field.as_str(), rc.value);
+                write_queries.push(wq);
+            }
+
+            let mut client =
+                influxdb::Client::new(&influxdb3_settings.url, &influxdb3_settings.database);
+            if influxdb3_settings.token.len() > 0 {
+                client = client.with_token(&influxdb3_settings.token);
+            }
+
+            if let Err(e) = client.query(&write_queries).await {
+                tracing::error!(
+                    "Error trying to write to InfluxDB at {}: {}",
+                    &influxdb3_settings.url,
+                    e
+                );
+            }
+        } else {
+            let mut points = vec![];
+            let req_builder = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .danger_accept_invalid_certs(true);
+            let builder = influxdb2::ClientBuilder::with_builder(
+                req_builder,
+                &influxdb_settings.url,
+                &influxdb_settings.org,
+                &influxdb_settings.token,
+            );
+            let client = builder.build()?;
+
+            for rc in rec.values {
+                let mut dp = influxdb2::models::DataPoint::builder(&influxdb_settings.measurement);
+
+                dp = dp
+                    .tag(CHIP_ID, rec.chip_id)
+                    .tag(CITY, rec.city)
+                    .tag(LAT, rec.lat.to_string())
+                    .tag(LON, rec.lon.to_string())
+                    .tag(INFO, rec.info)
+                    .tag(SENSOR_ID, rc.sensor_id)
+                    .tag(SENSOR_TYPE, rc.sensor_type);
+
+                dp = dp.field(rc.field.as_str(), rc.value);
+                points.push(dp.build()?);
+            }
+
+            if let Err(e) = client
+                .write(&influxdb_settings.bucket, futures::stream::iter(points))
+                .await
+            {
+                tracing::error!(
+                    "Error trying to write to InfluxDB at {}: {}",
+                    &influxdb_settings.url,
+                    e
+                );
+            }
+        }
+    */
     Ok(())
 }
 
