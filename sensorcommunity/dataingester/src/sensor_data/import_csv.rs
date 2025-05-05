@@ -1,13 +1,12 @@
 use csv::Reader;
-use influxdb::InfluxDbWriteable;
-use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::cache::Cache;
 use crate::config::Manifest;
 
-use super::{CHIP_ID, CITY, INFO, LAT, LON, SENSOR_ID, SENSOR_TYPE, TIMESTAMP, get_sensor_id};
+use super::{CHIP_ID, CITY, INFO, LAT, LON, TIMESTAMP, get_sensor_id};
 
 // Structure to hold our CSV data
 pub struct CsvData {
@@ -20,6 +19,7 @@ pub async fn import_csv(
     path: &Path,
     // influxdb3_settings: &crate::config::InfluxDB3,
     config: &Manifest,
+    writers: &[Arc<dyn crate::sensor_data::DataWriter>],
     sensor_cache: Cache<crate::SensorInfo>,
 ) -> Result<CsvData, Box<dyn Error>> {
     /*
@@ -39,9 +39,9 @@ pub async fn import_csv(
         record_count: 0,
     };
 
-    let mut fields = HashMap::new();
-
     let mut reader = Reader::from_path(path)?;
+
+    let mut fields = HashMap::new();
 
     // Get headers
     for (i, h) in reader.headers()?.iter().enumerate() {
@@ -75,7 +75,9 @@ pub async fn import_csv(
 
     // Read all records
 
-    let mut write_queries = Vec::<influxdb::WriteQuery>::new();
+    // let mut write_queries = Vec::<influxdb::WriteQuery>::new();
+
+    let mut data_recs = vec![];
 
     for result in reader.records() {
         if let Ok(record) = result {
@@ -158,6 +160,16 @@ pub async fn import_csv(
                 Some(i) => i,
             };
 
+            let mut data_rec = crate::sensor_data::Record {
+                timestamp,
+                chip_id: chip_id.to_owned(),
+                lat,
+                lon,
+                city: city.to_owned(),
+                info: info.to_owned(),
+                values: vec![],
+            };
+
             for (measure, sensor_type) in &config.measure_name_to_sensor_type {
                 if let Some(f) = config.measure_name_to_field.get(measure) {
                     let field_idx = match fields.get(measure) {
@@ -191,13 +203,21 @@ pub async fn import_csv(
                             tracing::error!(
                                 "Error trying to get the sensor id for chip id {} and sensor type {}: {}",
                                 chip_id,
-                                &sensor_type,
+                                sensor_type,
                                 e,
                             );
                             continue;
                         }
                     };
 
+                    data_rec.values.push(super::RecordValue {
+                        sensor_id,
+                        sensor_type: sensor_type.to_owned(),
+                        field: f.to_owned(),
+                        value,
+                    });
+
+                    /*
                     let mut wq =
                         influxdb::Timestamp::Seconds(timestamp).into_query(&config.influxdb3.table);
                     wq = wq
@@ -211,11 +231,23 @@ pub async fn import_csv(
                         .add_field(f, value);
 
                     write_queries.push(wq);
+                    */
                 }
             }
+
+            data_recs.push(data_rec);
         }
     }
 
+    let mut record_count = 0;
+    for w in writers {
+        if let Err(e) = w.write(&data_recs).await {
+            tracing::error!("Error trying to write records: {}", e);
+        } else {
+            record_count = record_count + 1;
+        }
+    }
+    /*
     let influxdb3_settings = &config.influxdb3;
     let mut client = influxdb::Client::new(&influxdb3_settings.url, &influxdb3_settings.database);
     if influxdb3_settings.token.len() > 0 {
@@ -229,9 +261,10 @@ pub async fn import_csv(
             e
         );
     }
+    */
 
     Ok(CsvData {
         _filename: filename,
-        record_count: write_queries.len() as i64,
+        record_count,
     })
 }

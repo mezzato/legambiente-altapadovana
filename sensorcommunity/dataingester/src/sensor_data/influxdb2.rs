@@ -15,7 +15,7 @@ impl InfluxDB2DataWriter {
 
 #[async_trait]
 impl DataWriter for InfluxDB2DataWriter {
-    async fn write<'b>(&self, rec: &super::Record<'b>) -> anyhow::Result<()> {
+    async fn write(&self, recs: &[super::Record]) -> anyhow::Result<()> {
         let mut points = vec![];
         let req_builder = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -28,22 +28,24 @@ impl DataWriter for InfluxDB2DataWriter {
         );
         let client = builder.build()?;
 
-        for d in &rec.values {
-            let mut dp = influxdb2::models::DataPoint::builder(&self.settings.measurement);
+        for rec in recs {
+            for d in &rec.values {
+                let mut dp = influxdb2::models::DataPoint::builder(&self.settings.measurement);
 
-            dp = dp
-                .tag(CHIP_ID, rec.chip_id)
-                .tag(CITY, rec.city)
-                .tag(LAT, rec.lat.to_string())
-                .tag(LON, rec.lon.to_string())
-                .tag(INFO, rec.info)
-                .tag(SENSOR_ID, d.sensor_id.to_owned())
-                .tag(SENSOR_TYPE, d.sensor_type);
+                dp = dp
+                    .timestamp(rec.timestamp as i64)
+                    .tag(CHIP_ID, rec.chip_id.as_str())
+                    .tag(CITY, rec.city.as_str())
+                    .tag(LAT, rec.lat.to_string())
+                    .tag(LON, rec.lon.to_string())
+                    .tag(INFO, rec.info.as_str())
+                    .tag(SENSOR_ID, d.sensor_id.as_str())
+                    .tag(SENSOR_TYPE, d.sensor_type.as_str());
 
-            dp = dp.field(d.field.as_str(), d.value);
-            points.push(dp.build()?);
+                dp = dp.field(d.field.as_str(), d.value);
+                points.push(dp.build()?);
+            }
         }
-
         client
             .write(&self.settings.bucket, futures::stream::iter(points))
             .await

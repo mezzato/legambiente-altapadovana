@@ -51,6 +51,7 @@ pub struct Manifest {
     pub https_addr: String,
     pub influxdb: InfluxDB,
     pub influxdb3: InfluxDB3,
+    pub questdb: QuestDB,
     pub logins: Vec<Login>,
     pub measure_name_to_field: HashMap<String, String>,
     pub measure_name_to_sensor_type: HashMap<String, String>,
@@ -350,6 +351,32 @@ pub struct InfluxDB3 {
     pub database: String,
     #[serde(default)]
     pub table: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct QuestDB {
+    #[serde(default)]
+    pub use_https: bool,
+    #[serde(default)]
+    pub addr: String,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub table: String,
+}
+
+impl Default for QuestDB {
+    fn default() -> Self {
+        QuestDB {
+            use_https: true,
+            addr: "".to_owned(),
+            username: "".to_owned(),
+            password: "".to_owned(),
+            table: "".to_owned(),
+        }
+    }
 }
 
 #[cfg(test)]

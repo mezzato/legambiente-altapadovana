@@ -119,6 +119,30 @@ async fn main() {
     };
 }
 
+fn get_writers(config: &Manifest) -> Vec<Arc<dyn crate::sensor_data::DataWriter>> {
+    // register writers
+    let mut writers = vec![];
+    if config.influxdb.url.len() > 0 {
+        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
+            crate::sensor_data::InfluxDB2DataWriter::new(config.influxdb.clone()),
+        );
+        writers.push(inf);
+    }
+    if config.influxdb3.url.len() > 0 {
+        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
+            crate::sensor_data::InfluxDB3DataWriter::new(config.influxdb3.clone()),
+        );
+        writers.push(inf);
+    }
+    if config.questdb.addr.len() > 0 {
+        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
+            crate::sensor_data::QuestDBDataWriter::new(config.questdb.clone()),
+        );
+        writers.push(inf);
+    }
+    writers
+}
+
 async fn serve(
     config: Manifest,
     _log_guard: tracing_appender::non_blocking::WorkerGuard,
@@ -167,24 +191,12 @@ async fn serve(
             .as_ref(),
     );
 
+    // register writers
+    let writers = get_writers(&config);
+
     let mut logins: HashMap<String, String> = HashMap::new();
     for login in config.logins {
         logins.insert(login.username.to_lowercase(), login.password);
-    }
-
-    // register writers
-    let mut writers = vec![];
-    if config.influxdb.url.len() > 0 {
-        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
-            crate::sensor_data::InfluxDB2DataWriter::new(config.influxdb),
-        );
-        writers.push(inf);
-    }
-    if config.influxdb3.url.len() > 0 {
-        let inf: Arc<dyn crate::sensor_data::DataWriter> = Arc::new(
-            crate::sensor_data::InfluxDB3DataWriter::new(config.influxdb3),
-        );
-        writers.push(inf);
     }
 
     // let use_influxdb_3 = influxdb_settings.url.len() == 0;
@@ -344,6 +356,11 @@ async fn import(
     _ctx: Context,
     dir: &PathBuf,
 ) {
+
+    // register writers
+    let writers = get_writers(&config);
+
+
     let sensors_filepath = shellexpand::env(&config.sensors_filepath.as_os_str().to_string_lossy())
         .unwrap()
         .as_ref()
@@ -367,7 +384,7 @@ async fn import(
 
         // Check if the file is a CSV
         if path.is_file() && path.extension().map_or(false, |ext| ext == "csv") {
-            match sensor_data::import_csv(path, &config, sensor_cache.clone()).await {
+            match sensor_data::import_csv(path, &config, &writers, sensor_cache.clone()).await {
                 Ok(r) => {
                     if r.record_count > 0 {
                         tracing::info!(

@@ -1,0 +1,54 @@
+use super::DataWriter;
+use async_trait::async_trait;
+use chrono::Utc;
+use questdb::ingress::{Buffer, Sender, TimestampNanos};
+
+use super::{CHIP_ID, CITY, INFO, LAT, LON, SENSOR_ID, SENSOR_TYPE};
+pub struct QuestDBDataWriter {
+    pub settings: crate::config::QuestDB,
+}
+
+impl QuestDBDataWriter {
+    pub fn new(settings: crate::config::QuestDB) -> Self {
+        QuestDBDataWriter { settings }
+    }
+}
+
+#[async_trait]
+impl DataWriter for QuestDBDataWriter {
+    async fn write(&self, recs: &[super::Record]) -> anyhow::Result<()> {
+        let schema = match self.settings.use_https {
+            true => "https",
+            false => "http",
+        };
+        let mut sender = Sender::from_conf(format!(
+            "{}::addr={};username={};password={};",
+            schema, self.settings.addr, self.settings.username, self.settings.password
+        ))?;
+
+        let mut buffer = Buffer::new();
+        let current_datetime = Utc::now();
+
+        let table = self.settings.table.as_str();
+
+        for rec in recs {
+            for d in &rec.values {
+                buffer
+                    .table(table)?
+                    .symbol(CHIP_ID, rec.chip_id.to_owned())?
+                    .symbol(CITY, rec.city.to_owned())?
+                    .symbol(LAT, rec.lat.to_string())?
+                    .symbol(LON, rec.lon.to_string())?
+                    .symbol(INFO, rec.info.to_owned())?
+                    .symbol(SENSOR_ID, d.sensor_id.to_owned())?
+                    .symbol(SENSOR_TYPE, d.sensor_type.to_owned())?
+                    .column_f64(d.field.as_str(), d.value)?
+                    .at(TimestampNanos::from_datetime(current_datetime)?)?;
+            }
+        }
+
+        sender.flush(&mut buffer)?;
+
+        Ok(())
+    }
+}

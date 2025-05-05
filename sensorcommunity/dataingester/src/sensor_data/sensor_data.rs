@@ -6,8 +6,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    BME280_HUMIDITY, BME280_PRESSURE, BME280_TEMPERATURE, BMP_PRESSURE, BMP_TEMPERATURE, DUR_P1, DUR_P2, HUMIDITY, P1, P2, RATIO_P1, RATIO_P2, SDS_P1, SDS_P2,
-    SIGNAL, TEMPERATURE,
+    BME280_HUMIDITY, BME280_PRESSURE, BME280_TEMPERATURE, BMP_PRESSURE, BMP_TEMPERATURE, DUR_P1,
+    DUR_P2, HUMIDITY, P1, P2, RATIO_P1, RATIO_P2, SDS_P1, SDS_P2, SIGNAL, TEMPERATURE,
 };
 
 // "Time", durP1;ratioP1;P1;durP2;ratioP2;P2;SDS_P1;SDS_P2;Temp;Humidity;BMP_temperature;BMP_pressure;BME280_temperature;BME280_humidity;BME280_pressure;Samples;Min_cycle;Max_cycle;Signal\n"
@@ -102,11 +102,12 @@ pub async fn write(
     d.chip_id = chip_id;
 
     let mut rec = crate::sensor_data::Record {
-        chip_id,
+        timestamp: timestamp as u128,
+        chip_id: chip_id.to_owned(),
         lat: d.lat,
         lon: d.lon,
-        city: &d.city,
-        info: &d.info,
+        city: d.city.clone(),
+        info: d.info.clone(),
         values: vec![],
     };
 
@@ -229,7 +230,7 @@ pub async fn write(
 
         rec.values.push(crate::sensor_data::RecordValue {
             sensor_id: sensor_id.clone(),
-            sensor_type,
+            sensor_type: sensor_type.to_owned(),
             field: field_name.clone(),
             value: v,
         });
@@ -243,8 +244,9 @@ pub async fn write(
         );
     }
 
+    let recs = &vec![rec];
     for w in writers {
-        if let Err(e) = w.write(&rec).await {
+        if let Err(e) = w.write(&recs).await {
             tracing::error!("Error trying to write record: {}", e);
         }
     }
