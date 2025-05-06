@@ -40,6 +40,9 @@ pub const BME280_PRESSURE: &str = "BME280_pressure";
 pub const SIGNAL: &str = "signal";
 pub const TIMESTAMP: &str = "timestamp";
 
+pub const FIELD: &str = "field";
+pub const VALUE: &str = "value";
+
 // Note that structs can derive both Serialize and Deserialize!
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct DataRecord<'a> {

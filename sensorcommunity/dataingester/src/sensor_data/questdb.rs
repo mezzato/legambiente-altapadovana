@@ -1,9 +1,10 @@
 use super::DataWriter;
+use anyhow::anyhow;
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use questdb::ingress::{Buffer, Sender, TimestampNanos};
 
-use super::{CHIP_ID, CITY, INFO, LAT, LON, SENSOR_ID, SENSOR_TYPE};
+use super::{CHIP_ID, CITY, FIELD, INFO, LAT, LON, SENSOR_ID, SENSOR_TYPE, VALUE};
 pub struct QuestDBDataWriter {
     pub settings: crate::config::QuestDB,
 }
@@ -27,11 +28,12 @@ impl DataWriter for QuestDBDataWriter {
         ))?;
 
         let mut buffer = Buffer::new();
-        let current_datetime = Utc::now();
 
         let table = self.settings.table.as_str();
 
         for rec in recs {
+            let dt: DateTime<Utc> = DateTime::from_timestamp(rec.timestamp as i64, 0)
+                .ok_or(anyhow!("invalid timestamp: {}", rec.timestamp))?;
             for d in &rec.values {
                 buffer
                     .table(table)?
@@ -42,8 +44,9 @@ impl DataWriter for QuestDBDataWriter {
                     .symbol(INFO, rec.info.to_owned())?
                     .symbol(SENSOR_ID, d.sensor_id.to_owned())?
                     .symbol(SENSOR_TYPE, d.sensor_type.to_owned())?
-                    .column_f64(d.field.as_str(), d.value)?
-                    .at(TimestampNanos::from_datetime(current_datetime)?)?;
+                    .symbol(FIELD, d.field.as_str())?
+                    .column_f64(VALUE, d.value)?
+                    .at(TimestampNanos::from_datetime(dt)?)?;
             }
         }
 

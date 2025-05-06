@@ -1,0 +1,21 @@
+[Unit]
+Description=QuestDB
+Documentation=https://www.questdb.com/docs/
+After=network.target
+
+[Service]
+Type=forking
+User=questdb
+Group=questdb
+Restart=always
+RestartSec=2
+ExecStart=/opt/questdb/bin/questdb.sh start
+ExecStop=/opt/questdb/bin/questdb.sh stop
+
+# Prevent writes to /usr, /boot, and /etc
+ProtectSystem=full
+StandardError=syslog
+SyslogIdentifier=questdb
+
+[Install]
+WantedBy=multi-user.target

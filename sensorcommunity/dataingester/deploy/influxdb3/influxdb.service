@@ -9,9 +9,9 @@ Group=influxdb
 LimitNOFILE=65536
 EnvironmentFile=-/etc/default/influxdb3
 KillMode=control-group
-ExecStart=/home/influxdb/.influxdb/influxdb3 serve --http-bind 0.0.0.0:8181 --object-store file --data-dir /home/influxdb/.influxdb/data --node-id host01 --log-filter info --max-http-request-size 20971520
 Type=simple
 TimeoutStartSec=10
+ExecStart=/home/influxdb/.influxdb/influxdb3 serve --http-bind 0.0.0.0:8181 --object-store file --data-dir /home/influxdb/.influxdb/data --node-id host01 --cluster-id cluster01 --log-filter info --max-http-request-size 20971520
 
 [Install]
 WantedBy=multi-user.target
