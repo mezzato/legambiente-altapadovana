@@ -11,6 +11,7 @@ Restart=always
 RestartSec=2
 ExecStart=/opt/questdb/bin/questdb.sh start
 ExecStop=/opt/questdb/bin/questdb.sh stop
+LimitNOFILE=1048576
 
 # Prevent writes to /usr, /boot, and /etc
 ProtectSystem=full
