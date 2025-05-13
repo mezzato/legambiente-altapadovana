@@ -17,6 +17,8 @@
             "INFLUXDB3_ORG":"legambiente",
             "INFLUXDB3_TABLE":"particulate",
             "INFLUXDB3_TOKEN":"apiv3_DLgdD2kGmyjPsbIVluvgnEvJF1sCCXpyguujy5LyWxMbppSMUmigbIZwjcvPlJ0x-JJKXZctLd4zznwEYf5Hkg",
+            "QDB_CLIENT_CONF":"http::addr=localhost:9000;username=;password=;",
+            "QDB_TABLE":"particulate",
             }
         }
     ]

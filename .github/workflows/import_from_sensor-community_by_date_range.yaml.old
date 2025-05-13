@@ -1,4 +1,4 @@
-name: "Import data from Sensor Community"
+name: "Import from Sensor Community by date range"
 run-name: "qr: Import sensor IDs: ${{ inputs.sensors }}, from ${{ inputs.start }} to  ${{ inputs.end }}"
 on:
   workflow_dispatch:
@@ -30,19 +30,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install InfluxDB client
         working-directory: ./sensorcommunity/dataingester
-        shell: bash
         run: |
-          echo -n "Install QuestDB Python module"
-          sudo apt install python3-pip
-          # use python3 --version to determine the specific version
-          sudo apt install python3.12-venv
-          python3 -m venv .venv
-          .venv/bin/pip install -U questdb
+          ./install_influxdb_python_cli.sh
       - name: Import daily data from Sensor Community for specific sensors
         working-directory: ./sensorcommunity/dataingester
         run: |
           source .venv/bin/activate
-          ./import_data_by_date_range_questdb.py
+          ./import_data_by_date_range.py
         env:
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
