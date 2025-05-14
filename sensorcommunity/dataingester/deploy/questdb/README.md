@@ -29,3 +29,11 @@ see [OS configuration](https://questdb.com/docs/operations/capacity-planning/#os
 # Set up partitioning
 
 See [Database partitioning](https://questdb.com/glossary/database-partitioning/)
+
+
+# TLS Encryption
+
+As of writing, only QuestDB Enterprise can be configured to support TLS natively.
+If you're using the open source edition, you can still use TLS encryption by setting
+up [HAProxy](http://www.haproxy.org/) or other proxy
+to secure the connection for any public-facing servers.
