@@ -235,7 +235,7 @@ def main():
 
                 # Use the with...as statement to ensure the file is properly closed and resources
                 # are released.
-                with Sender.from_conf(questdb_config.get("QDB_CLIENT_CONF")) as sender:
+                with Sender.from_conf(questdb_config.get("QDB_CLIENT_CONF"), tls_verify=False) as sender:
                     # Record with provided designated timestamp (using the 'at' param)
                     # Notice the designated timestamp is expected in Nanoseconds,
                     # but timestamps in other columns are expected in Microseconds.
