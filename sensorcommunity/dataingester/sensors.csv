@@ -1,6 +1,8 @@
 chip_id,sensor_id,sensor_type
 esp8266-15303512,62574,SDS011
 esp8266-15303512,62575,DHT22
+_camporovere1,59571,SDS011
+_canove1,78027,SDS011
 _carmignano1,62177,SDS011
 _carmignano4,88093,SDS011
 _carmignano5,86296,SDS011
