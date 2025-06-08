@@ -30,7 +30,7 @@ def get_environment_variables():
     Set default values if they are not set.
     
     Returns:
-        tuple: (start_datetime, end_datetime, sensors_list, config)
+        tuple: (start_datetime, end_datetime, sensors_list, include_registered_sensors, config)
     """
     # Get START environment variable with default
     start_str = os.environ.get("START")
@@ -76,6 +76,16 @@ def get_environment_variables():
         # Default sensors list
         sensors_list = []
         print(f"SENSORS environment variable not set. Using default: {', '.join(sensors_list)}")
+
+    # Get SENSORS environment variable with default
+    include_registered_sensors_str = os.environ.get("INCLUDE_REGISTERED_SENSORS")
+    if include_registered_sensors_str:
+        # convert to bool
+        include_registered_sensors = include_registered_sensors_str.strip().lower() == "true"
+    else:
+        # Default sensors list
+        include_registered_sensors = False
+        print(f"INCLUDE_REGISTERED_SENSORS environment variable not set. Using default: {include_registered_sensors}")
     
     """
     Retrieves QuestDB configuration from environment variables.
@@ -116,7 +126,7 @@ def get_environment_variables():
         sys.exit(1)
     
 
-    return start_datetime, end_datetime, sensors_list, config
+    return start_datetime, end_datetime, sensors_list, include_registered_sensors, config
 
 def safe_float_convert(value):
     try:
@@ -148,13 +158,14 @@ def main():
     print(f"importing data")
 
     # Get environment variables
-    start, end, sensor_ids, questdb_config = get_environment_variables()
+    start, end, sensor_ids, include_registered_sensors, questdb_config = get_environment_variables()
     
     # Print the parsed variables
     print("\nParsed Environment Variables:")
     print(f"START: {start}")
     print(f"END: {end}")
     print(f"SENSORS: {sensor_ids}")
+    print(f"INCLUDE REGISTERED SENSORS: {include_registered_sensors}")
     
     # Your program logic would go here
     print("\nTime range duration:", end - start)
@@ -171,7 +182,7 @@ def main():
         for sensor in sensor_cache.sensors:
 
             chip_id = sensor['chip_id']
-            if not chip_id.startswith("_"):
+            if not include_registered_sensors and chip_id.startswith("_"):
                 print('Skipping chip id: {}'.format(chip_id))
                 continue
             sensor_id = sensor['sensor_id']
