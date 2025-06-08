@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 
 def get_environment_variables():
     """
-    Get environment variables START, END, and SENSORS.
+    Get environment variables START, END, INCLUDE_REGISTERED_SENSORS and SENSORS.
     Set default values if they are not set.
     
     Returns:
