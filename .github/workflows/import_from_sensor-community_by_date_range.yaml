@@ -55,7 +55,7 @@ jobs:
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
           SENSORS: ${{ inputs.sensors }}
-          INCLUDE_REGISTERED_SENSORS: ${{ include_registered_sensors }}
+          INCLUDE_REGISTERED_SENSORS: ${{ inputs.include_registered_sensors }}
           QDB_TABLE: ${{ vars.QDB_TABLE }}
           QDB_CLIENT_CONF: ${{ secrets.QDB_CLIENT_CONF }}
 
