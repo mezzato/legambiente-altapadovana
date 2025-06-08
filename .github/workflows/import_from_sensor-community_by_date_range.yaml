@@ -18,6 +18,14 @@ on:
         description: "end date (format 2024-12-27), if missing yesterday"
         required: false
         default: ""
+      include_registered_sensors:
+        type: choice
+        description: "include registered sensors (chip id not starting with _), if missing false"
+        required: false
+        default: 'false'
+        options:
+          - true
+          - false
   schedule:
     - cron: "0 11 * * *"
 
@@ -47,6 +55,7 @@ jobs:
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
           SENSORS: ${{ inputs.sensors }}
+          INCLUDE_REGISTERED_SENSORS: ${{ include_registered_sensors }}
           QDB_TABLE: ${{ vars.QDB_TABLE }}
           QDB_CLIENT_CONF: ${{ secrets.QDB_CLIENT_CONF }}
 
