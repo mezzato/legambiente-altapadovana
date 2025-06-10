@@ -182,7 +182,7 @@ def main():
         for sensor in sensor_cache.sensors:
 
             chip_id = sensor['chip_id']
-            if not include_registered_sensors and chip_id.startswith("_"):
+            if not include_registered_sensors and not chip_id.startswith("_"):
                 print('Skipping chip id: {}'.format(chip_id))
                 continue
             sensor_id = sensor['sensor_id']
