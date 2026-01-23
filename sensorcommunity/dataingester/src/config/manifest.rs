@@ -132,7 +132,7 @@ impl Manifest {
     {
         let toml_str = &fs::read_to_string(path)?;
         let mut manifest = toml::from_str::<Manifest>(toml_str)
-            .with_context(|| ("Unable to load manifest: {}"))?;
+            .with_context(|| "Unable to load manifest: {}" )?;
         manifest.path = PathBuf::from(path);
         let guard = manifest.logging.setup()?;
         Ok((manifest, guard))
@@ -265,7 +265,7 @@ impl Logging {
             .with(filtered_layer)
             // .with(...)
             .try_init()
-            .with_context(|| ("Unable to set global default subscriber: {}"))?;
+            .with_context(|| "Unable to set global default subscriber: {}")?;
 
         let reload_fn = move |level: &str| -> std::result::Result<(), anyhow::Error> {
             let new_filter = EnvFilter::try_new(level.to_lowercase())?;

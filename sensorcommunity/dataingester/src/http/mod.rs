@@ -157,14 +157,22 @@ where
             .to_owned();
 
         if enabled!(Level::DEBUG) {
-            tracing::debug!("request received from origin: {}", origin);
+            tracing::debug!(
+                "request received from sensor: {}, origin: {}",
+                sensor,
+                origin
+            );
         }
 
         let creds = match parts.extract::<TypedHeader<Authorization<Basic>>>().await {
             Ok(TypedHeader(Authorization(bearer))) => bearer,
             Err(_) => {
                 if enabled!(Level::DEBUG) {
-                    tracing::debug!("missing credentials for origin: {}", origin);
+                    tracing::debug!(
+                        "missing credentials for sensor: {}, origin: {}",
+                        sensor,
+                        origin
+                    );
                 }
 
                 return Err((
@@ -184,8 +192,9 @@ where
             .ok_or_else(|| {
                 if enabled!(Level::DEBUG) {
                     tracing::debug!(
-                        "wrong credentials for username {}, origin: {}",
+                        "wrong credentials in configuration for username {}, sensor: {}, origin: {}",
                         &creds.username(),
+                        &sensor,
                         origin
                     );
                 }
@@ -197,7 +206,15 @@ where
                 )
             })?;
 
-        if pwd != creds.password() {
+        let config_password = creds.password().trim();
+        let req_password = pwd.trim();
+        if req_password != config_password {
+            tracing::debug!(
+                "wrong password for username {}, sensor: {}, origin: {}",
+                &creds.username(),
+                &sensor,
+                origin,
+            );
             return Err((
                 StatusCode::UNAUTHORIZED,
                 Json(json!({"error": "Unauthorized"})),
