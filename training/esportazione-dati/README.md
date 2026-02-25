@@ -7,6 +7,8 @@ Ogni sensore ha un ID proprio e compare con un ID diverso sulla mappa di Sensor 
 L'ID della centralina, o chip ID, viene usato per identificare tutti i sensori all'interno della centralina ed e' noto solo a chi la installa.
 Anche il chip ID puo' essere usato per scaricare i dati (vedi sotto).
 
+![hardware schema](./media/hardware_schema.png)
+
 Per l'esportazione serve conoscere l'ID del sensore di polveri sottili della propria centralina, questo si puo' vedere sulla [mappa di Sensor Community](https://sensor.community/it/) (88091 nell'immagine):
 
 ![sensor ID PM](./media/sensor_id.png)
