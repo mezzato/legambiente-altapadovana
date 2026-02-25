@@ -4,7 +4,7 @@ Data di aggiornamento: 2025.02.05
 
 link utili:
 
-- [pagina di visualizzazione dei dati](https://aernostrum.it:3000/d/ee30edkvuqdc0c/pm2-5-pm10?from=now-24h&to=now&timezone=browser&var-city=Carmignano%20di%20Brenta&var-city=Fontaniva&var-sensor=$__all)
+- [pagina di visualizzazione dei dati](https://aerdigitalis.eu:3000/d/ee30edkvuqdc0c/pm2-5-pm10?var-timerange=10m&orgId=1&from=now-24h&to=now&timezone=browse&var-city=Vicenza&var-hidden_city2chip_id=$__all&var-sensor=$__all)
 - [Sensor Community](https://sensor.community/it/)
 - [Introduzione a Grafana (inglese)](https://grafana.com/docs/grafana/latest/getting-started/build-first-dashboard/)
 
@@ -80,7 +80,7 @@ Per esempio: [influxdb per legambiente](https://static.125.41.201.195.clients.yo
 
 ## Dove vengono visualizzati i dati
 
-Grafana, che e' un tool opensource, attualmente qui: <https://aernostrum.it:3000/>
+Grafana, che e' un tool opensource, attualmente qui: <https://aerdigitalis.eu:3000/>
 
 username: legambiente
 
@@ -90,7 +90,7 @@ password: legambiente
 
 Grafana permette di creare delle dashboard, ossia delle pagine con visualizzazioni dei dati, per esempio quella ufficiale
 
-[Valori PM10 e PM2.5 per centraline tracciate da Legambiente](https://aernostrum.it:3000/d/ee30edkvuqdc0c/pm2-5-pm10?from=now-24h&to=now&timezone=browser&var-city=Carmignano%20di%20Brenta&var-city=Fontaniva&var-sensor=$__all)
+[Valori PM10 e PM2.5 per centraline tracciate da Legambiente](https://aerdigitalis.eu:3000/d/ee30edkvuqdc0c/pm2-5-pm10?var-timerange=10m&orgId=1&from=now-24h&to=now&timezone=browse&var-city=Vicenza&var-hidden_city2chip_id=$__all&var-sensor=$__all)
 
 ## Che significato hanno i parametri della dashboard
 
@@ -118,4 +118,4 @@ Con gli opportuni diritti di accesso editare il file <https://github.com/mezzato
 
 ## Per curiosita' si possono vedere gli alert
 
-<https://aernostrum.it:3000/alerting/list>
+<https://aerdigitalis.eu:3000/>

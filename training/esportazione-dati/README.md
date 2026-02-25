@@ -97,4 +97,39 @@ Si puo' usare il sito di Grafana di Sensor Community (madavi.de) in due modi:
 
 ## Esportare dal sito di Grafana di Legambiente
 
-Questo metodo permette una ricerca temporale piu' agevole, perche' i dati di Sensor Community possono solo essere esportati giorno per giorno.
+Questo metodo permette una ricerca temporale piu' agevole e si possono esportare i dati di piu' sensori simultaneamente.
+
+Il sito di grafana di Legambiente Altapadovana e' disponibile su: [https://aerdigitalis.eu:3000/](https://aerdigitalis.eu:3000/d/ee30edkvuqdc0c/pm2-5-pm10?var-timerange=10m&orgId=1&from=now-24h&to=now&timezone=browse&var-city=Vicenza&var-hidden_city2chip_id=$__all&var-sensor=$__all). Chiedere un account con i permessi voluti per accedere.
+
+Per ogni grafico si possono esportare i dati come spiegato sopra. Per esempio:
+
+![aerdigitalis inspect](./media/aerdigitalis-inspect.png)
+
+## Dashboard di Grafana
+
+link utili: [documentazione di Grafana su dashboard(inglese)](https://grafana.com/docs/grafana/latest/dashboards/)
+
+1. Come generare, editare, esportare, importare una dashboard
+2. Variabili
+3. Condividere una dashboard
+4. Come usare una visualization di una dashboard in un sito esterno
+5. Come settare notifiche
+
+### Dashboard
+
+[Qui la documentazione](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/create-dashboard/)
+
+Tutti gli esempi si possono fare su [Grafana Sandbox](https://grafana.com/grafana/), qui per [esempio](https://play.grafana.org/dashboards)
+
+1. Come creare una nuova dashboard
+1. Come editare, copiare e salvare una dashboard
+1. Come esportare una dashboard
+1. Come importare una dashboard
+1. [Come assegnare permessi ad utenti](https://grafana.com/docs/grafana/latest/administration/roles-and-permissions/#dashboard-permissions)
+
+### Condividere una dashboard
+
+### Come mostrare la visualization in un sito esterno
+
+Per esempio si veda: <https://sites.google.com/view/pm10-fontaniva/home>
+
