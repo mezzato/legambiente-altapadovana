@@ -100,7 +100,19 @@ pub struct Record {
     pub timestamp: u128,
 }
 
+pub struct SensorInfoRecord {
+    pub sensor_id: String,
+    pub sensor_type: String,
+    pub chip_id: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub city: String,
+    pub info: String,
+}
+
+
 #[async_trait]
 pub trait DataWriter: Sync + Send {
     async fn write(&self, recs: &[Record]) -> anyhow::Result<()>;
+    async fn refresh_sensor_info(&self, recs: &[SensorInfoRecord]) -> anyhow::Result<()>;
 }

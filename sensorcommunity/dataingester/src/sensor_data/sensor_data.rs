@@ -72,6 +72,7 @@ pub async fn write(
 
     let timestamp = Utc::now().timestamp();
 
+    // used to write the csv file, we can remove it later if we want to only write to the databases
     let mut d = crate::sensor_data::DataRecord::default();
 
     match chip_cache.read() {
@@ -101,6 +102,7 @@ pub async fn write(
     d.timestamp = timestamp;
     d.chip_id = chip_id;
 
+    // used to write to the databases (writers)
     let mut rec = crate::sensor_data::Record {
         timestamp: timestamp as u128,
         chip_id: chip_id.to_owned(),

@@ -365,6 +365,12 @@ pub struct QuestDB {
     pub password: String,
     #[serde(default)]
     pub table: String,
+    #[serde(default = "default_sensor_info_table")]
+    pub sensor_info_table: String,
+}
+
+fn default_sensor_info_table() -> String {
+    "sensor_info".to_owned()
 }
 
 impl Default for QuestDB {
@@ -375,6 +381,7 @@ impl Default for QuestDB {
             username: "".to_owned(),
             password: "".to_owned(),
             table: "".to_owned(),
+            sensor_info_table: default_sensor_info_table(),
         }
     }
 }

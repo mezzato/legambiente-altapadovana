@@ -59,4 +59,8 @@ impl DataWriter for InfluxDB2DataWriter {
 
         Ok(())
     }
+
+    async fn refresh_sensor_info(&self, _recs: &[super::SensorInfoRecord]) -> anyhow::Result<()> {
+        Ok(())
+    }
 }

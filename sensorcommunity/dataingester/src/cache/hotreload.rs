@@ -94,6 +94,7 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
     (
         Cache<T>,
         Arc<RwLock<Debouncer<RecommendedWatcher, RecommendedCache>>>,
+        tokio::sync::watch::Receiver<u64>,
     ),
     Box<dyn std::error::Error>,
 > {
@@ -107,6 +108,8 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
     let cloned_config = Arc::clone(&config);
 
     let cloned_path = path.to_owned();
+
+    let (watch_tx, watch_rx) = tokio::sync::watch::channel(0u64);
 
     let (mut watcher, mut rx) = async_debounce_watcher()?;
 
@@ -148,7 +151,8 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
                                             new_config.len(),
                                         );
                                         let mut w = cloned_config.write().unwrap();
-                                        *w = new_config
+                                        *w = new_config;
+                                        watch_tx.send_modify(|v| *v += 1);
                                     }
                                     Err(error) => {
                                         tracing::error!(
@@ -195,5 +199,5 @@ pub fn load_cache<T: CacheKey + serde::de::DeserializeOwned + Send + Sync + 'sta
         }
     });
 
-    Ok((config, watcher_lock_clone))
+    Ok((config, watcher_lock_clone, watch_rx))
 }

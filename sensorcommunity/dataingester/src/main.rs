@@ -143,6 +143,52 @@ fn get_writers(config: &Manifest) -> Vec<Arc<dyn crate::sensor_data::DataWriter>
     writers
 }
 
+fn build_sensor_info_records(
+    chip_cache: &crate::cache::Cache<ChipInfo>,
+    sensor_cache: &crate::cache::Cache<SensorInfo>,
+) -> Vec<sensor_data::SensorInfoRecord> {
+    let chips = chip_cache.read().unwrap();
+    let sensors = sensor_cache.read().unwrap();
+
+    let mut records = Vec::new();
+    for sensor in sensors.values() {
+        match chips.get(&sensor.chip_id) {
+            Some(chip) => {
+                records.push(sensor_data::SensorInfoRecord {
+                    sensor_id: sensor.sensor_id.clone(),
+                    sensor_type: sensor.sensor_type.clone(),
+                    chip_id: sensor.chip_id.clone(),
+                    lat: chip.lat,
+                    lon: chip.lon,
+                    city: chip.city.clone(),
+                    info: chip.info.clone(),
+                });
+            }
+            None => {
+                tracing::warn!(
+                    "sensor {} (chip_id={}) has no matching chip info, skipping",
+                    sensor.sensor_id,
+                    sensor.chip_id
+                );
+            }
+        }
+    }
+    records
+}
+
+async fn refresh_sensor_info_on_writers(
+    chip_cache: &crate::cache::Cache<ChipInfo>,
+    sensor_cache: &crate::cache::Cache<SensorInfo>,
+    writers: &[Arc<dyn crate::sensor_data::DataWriter>],
+) {
+    let records = build_sensor_info_records(chip_cache, sensor_cache);
+    for writer in writers {
+        if let Err(e) = writer.refresh_sensor_info(&records).await {
+            tracing::error!("failed to refresh sensor info: {}", e);
+        }
+    }
+}
+
 async fn serve(
     config: Manifest,
     _log_guard: tracing_appender::non_blocking::WorkerGuard,
@@ -156,7 +202,7 @@ async fn serve(
         .to_owned();
 
     // load chip cache with hot reload
-    let (chip_cache, _watcher) = match load_cache::<ChipInfo>(&chips_filepath) {
+    let (chip_cache, _watcher, chip_watch_rx) = match load_cache::<ChipInfo>(&chips_filepath) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("could not load the chip info cache: {}", e);
@@ -169,11 +215,11 @@ async fn serve(
         .as_ref()
         .to_owned();
 
-    // load chip cache with hot reload
-    let (sensor_cache, _watcher) = match load_cache::<SensorInfo>(&sensors_filepath) {
+    // load sensor cache with hot reload
+    let (sensor_cache, _watcher, sensor_watch_rx) = match load_cache::<SensorInfo>(&sensors_filepath) {
         Ok(c) => c,
         Err(e) => {
-            tracing::error!("could not load the chip info cache: {}", e);
+            tracing::error!("could not load the sensor info cache: {}", e);
             return;
         }
     };
@@ -193,6 +239,32 @@ async fn serve(
 
     // register writers
     let writers = get_writers(&config);
+
+    // initial sensor info sync
+    refresh_sensor_info_on_writers(&chip_cache, &sensor_cache, &writers).await;
+
+    // spawn background task to refresh sensor info on cache changes
+    {
+        let chip_cache_bg = chip_cache.clone();
+        let sensor_cache_bg = sensor_cache.clone();
+        let writers_bg: Vec<Arc<dyn crate::sensor_data::DataWriter>> = writers.clone();
+        let mut chip_rx = chip_watch_rx;
+        let mut sensor_rx = sensor_watch_rx;
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    res = chip_rx.changed() => {
+                        if res.is_err() { break; }
+                    }
+                    res = sensor_rx.changed() => {
+                        if res.is_err() { break; }
+                    }
+                }
+                tracing::info!("cache change detected, refreshing sensor info");
+                refresh_sensor_info_on_writers(&chip_cache_bg, &sensor_cache_bg, &writers_bg).await;
+            }
+        });
+    }
 
     let mut logins: HashMap<String, String> = HashMap::new();
     for login in config.logins {
@@ -367,7 +439,7 @@ async fn import(
         .to_owned();
 
     // load chip cache with hot reload
-    let (sensor_cache, _watcher) = match load_cache::<SensorInfo>(&sensors_filepath) {
+    let (sensor_cache, _watcher, _watch_rx) = match load_cache::<SensorInfo>(&sensors_filepath) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("could not load the chip info cache: {}", e);
