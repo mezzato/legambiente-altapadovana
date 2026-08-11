@@ -1,3 +1,3 @@
 # legambiente-altapadovana
 
-This repo contains development code for Legambiente Altapadovana.
+This repo contains development code for Legambiente Alta Padovana.
